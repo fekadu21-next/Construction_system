@@ -144,6 +144,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUserData = (updatedData) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedData } : updatedData));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -158,6 +162,7 @@ export const AuthProvider = ({ children }) => {
         verifyEmail,
         resendVerificationEmail,
         checkAuth,
+        updateUserData,
       }}
     >
       {children}

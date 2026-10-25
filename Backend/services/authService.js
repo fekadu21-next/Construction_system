@@ -21,6 +21,8 @@ export const authService = {
           id: true,
           fullName: true,
           email: true,
+          phone: true,
+          profilePhotoUrl: true,
           passwordHash: true,
           role: {
             select: {
@@ -77,6 +79,8 @@ export const authService = {
           id: user.id,
           fullName: user.fullName,
           email: user.email,
+          phone: user.phone,
+          profilePhotoUrl: user.profilePhotoUrl,
           role: user.role.name,
         },
         accessToken,
@@ -127,6 +131,37 @@ export const authService = {
     }
 
     if (session.revokedAt) {
+      // 30-second grace window for concurrent requests during token rotation
+      const gracePeriodMs = 30 * 1000;
+      const revokedTime = new Date(session.revokedAt).getTime();
+      const isWithinGrace = Date.now() - revokedTime < gracePeriodMs;
+
+      if (isWithinGrace && session.replacedBySessionId) {
+        const replacement = await prisma.refreshSession.findUnique({
+          where: { id: session.replacedBySessionId },
+          include: {
+            user: {
+              select: {
+                id: true,
+                isActive: true,
+                role: { select: { name: true } },
+              },
+            },
+          },
+        });
+
+        if (replacement && !replacement.revokedAt && replacement.expiresAt > new Date() && replacement.user?.isActive) {
+          const accessToken = generateAccessToken({
+            userId: replacement.user.id,
+            role: replacement.user.role.name,
+          });
+          return {
+            accessToken,
+            refreshToken: null,
+          };
+        }
+      }
+
       throw new Error("Refresh token has been revoked");
     }
 
@@ -147,24 +182,23 @@ export const authService = {
     const newRefreshTokenHash = hashToken(newRefreshToken);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    await prisma.$transaction([
-      prisma.refreshSession.update({
-        where: { id: session.id },
-        data: {
-          revokedAt: new Date(),
-          replacedBySessionId: newRefreshTokenHash,
-        },
-      }),
-      prisma.refreshSession.create({
-        data: {
-          userId: session.user.id,
-          tokenHash: newRefreshTokenHash,
-          expiresAt,
-          userAgent,
-          ipAddress,
-        },
-      }),
-    ]);
+    const newSession = await prisma.refreshSession.create({
+      data: {
+        userId: session.user.id,
+        tokenHash: newRefreshTokenHash,
+        expiresAt,
+        userAgent,
+        ipAddress,
+      },
+    });
+
+    await prisma.refreshSession.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: new Date(),
+        replacedBySessionId: newSession.id,
+      },
+    });
 
     return {
       accessToken,
@@ -188,6 +222,8 @@ export const authService = {
         id: true,
         fullName: true,
         email: true,
+        phone: true,
+        profilePhotoUrl: true,
         role: {
           select: {
             name: true,
@@ -196,6 +232,7 @@ export const authService = {
         },
         isActive: true,
         emailVerifiedAt: true,
+        createdAt: true,
       },
     });
 
@@ -211,10 +248,70 @@ export const authService = {
       id: user.id,
       fullName: user.fullName,
       email: user.email,
+      phone: user.phone,
+      profilePhotoUrl: user.profilePhotoUrl,
       role: user.role.name,
       roleDescription: user.role.description,
       isActive: user.isActive,
       emailVerifiedAt: user.emailVerifiedAt,
+      createdAt: user.createdAt,
+    };
+  },
+
+  async updateProfile(userId, data) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const updateData = {};
+    if (data.fullName !== undefined && data.fullName.trim()) {
+      updateData.fullName = data.fullName.trim();
+    }
+    if (data.phone !== undefined) {
+      updateData.phone = data.phone ? data.phone.trim() : null;
+    }
+    if (data.profilePhotoUrl !== undefined) {
+      updateData.profilePhotoUrl = data.profilePhotoUrl;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        profilePhotoUrl: true,
+        role: {
+          select: {
+            name: true,
+            description: true,
+          },
+        },
+        isActive: true,
+        emailVerifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      id: updatedUser.id,
+      fullName: updatedUser.fullName,
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      profilePhotoUrl: updatedUser.profilePhotoUrl,
+      role: updatedUser.role.name,
+      roleDescription: updatedUser.role.description,
+      isActive: updatedUser.isActive,
+      emailVerifiedAt: updatedUser.emailVerifiedAt,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
     };
   },
 
@@ -400,5 +497,33 @@ export const authService = {
       console.error("Resend verification email service error:", error);
       throw new Error("Unable to send verification email");
     }
+  },
+
+  async updateProfile(userId, { fullName, phone, profilePhotoUrl }) {
+    const data = {};
+    if (fullName !== undefined) data.fullName = fullName ? fullName.trim() : "";
+    if (phone !== undefined) data.phone = phone ? phone.trim() : null;
+    if (profilePhotoUrl !== undefined) data.profilePhotoUrl = profilePhotoUrl;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        profilePhotoUrl: true,
+        isActive: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return updatedUser;
   },
 };

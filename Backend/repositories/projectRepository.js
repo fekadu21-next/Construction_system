@@ -130,34 +130,45 @@ export const projectRepository = {
   async getMetrics() {
     const activeWhere = { archivedAt: null };
 
-    const [
-      totalProjects,
-      inProgress,
-      completed,
-      unassigned,
-      planned,
-      onHold,
-      cancelled,
-      archived,
-    ] = await Promise.all([
-      prisma.project.count({ where: activeWhere }),
-      prisma.project.count({ where: { ...activeWhere, status: "IN_PROGRESS" } }),
-      prisma.project.count({ where: { ...activeWhere, status: "COMPLETED" } }),
-      prisma.project.count({ where: { ...activeWhere, projectManagerId: null } }),
-      prisma.project.count({ where: { ...activeWhere, status: "PLANNED" } }),
-      prisma.project.count({ where: { ...activeWhere, status: "ON_HOLD" } }),
-      prisma.project.count({ where: { ...activeWhere, status: "CANCELLED" } }),
-      prisma.project.count({ where: { archivedAt: { not: null } } }),
-    ]);
+    // Group active projects by status in a single query
+    const statusGroups = await prisma.project.groupBy({
+      by: ["status"],
+      _count: { id: true },
+      where: activeWhere,
+    });
+
+    const statusMap = {
+      IN_PROGRESS: 0,
+      COMPLETED: 0,
+      PLANNED: 0,
+      ON_HOLD: 0,
+      CANCELLED: 0,
+    };
+
+    let totalProjects = 0;
+    for (const group of statusGroups) {
+      if (group.status) {
+        statusMap[group.status] = group._count.id;
+        totalProjects += group._count.id;
+      }
+    }
+
+    const unassigned = await prisma.project.count({
+      where: { ...activeWhere, projectManagerId: null },
+    });
+
+    const archived = await prisma.project.count({
+      where: { archivedAt: { not: null } },
+    });
 
     return {
       totalProjects,
-      inProgress,
-      completed,
+      inProgress: statusMap["IN_PROGRESS"] || 0,
+      completed: statusMap["COMPLETED"] || 0,
       unassigned,
-      planned,
-      onHold,
-      cancelled,
+      planned: statusMap["PLANNED"] || 0,
+      onHold: statusMap["ON_HOLD"] || 0,
+      cancelled: statusMap["CANCELLED"] || 0,
       archived,
     };
   },

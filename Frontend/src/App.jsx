@@ -17,6 +17,7 @@ import DashboardPage from "./pages/general-manager/DashboardPage.jsx";
 import UsersPage from "./pages/general-manager/UsersPage.jsx";
 import ProjectsPage from "./pages/general-manager/ProjectsPage.jsx";
 import CreateProjectPage from "./pages/general-manager/CreateProjectPage.jsx";
+import SettingsPage from "./pages/general-manager/SettingsPage.jsx";
 import PlaceholderPage from "./pages/general-manager/PlaceholderPage.jsx";
 import ProfilePage from "./pages/general-manager/ProfilePage.jsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
@@ -57,7 +58,7 @@ function AppRoutes() {
         <Route path="ai-insights" element={<PlaceholderPage title="AI Insights" />} />
         <Route path="reports" element={<PlaceholderPage title="Reports & Analytics" />} />
         <Route path="audit-logs" element={<PlaceholderPage title="Audit Logs" />} />
-        <Route path="settings" element={<PlaceholderPage title="Settings" />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

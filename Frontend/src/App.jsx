@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
+import { NotificationProvider } from "./contexts/NotificationContext.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import { LanguageProvider } from "./contexts/LanguageContext.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
@@ -19,9 +20,18 @@ import ProjectsPage from "./pages/general-manager/ProjectsPage.jsx";
 import CreateProjectPage from "./pages/general-manager/CreateProjectPage.jsx";
 import PlaceholderPage from "./pages/general-manager/PlaceholderPage.jsx";
 import ProfilePage from "./pages/general-manager/ProfilePage.jsx";
-import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
+import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
-import { getDashboardRoute } from "./constants/roles.js";
+import { USER_ROLES, getDashboardRoute } from "./constants/roles.js";
+import HRManagerLayout from "./layouts/HRManagerLayout.jsx";
+import HRDashboardPage from "./pages/hr/HRDashboardPage.jsx";
+import EmployeesPage from "./pages/hr/EmployeesPage.jsx";
+import AttendancePage from "./pages/hr/AttendancePage.jsx";
+import LeaveRequestsPage from "./pages/hr/LeaveRequestsPage.jsx";
+import PayrollPage from "./pages/hr/PayrollPage.jsx";
+import HRProfilePage from "./pages/hr/HRProfilePage.jsx";
+import HRNotificationsPage from "./pages/hr/HRNotificationsPage.jsx";
+import HRSettingsPage from "./pages/hr/HRSettingsPage.jsx";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -50,7 +60,7 @@ function AppRoutes() {
         <Route path="projects/create" element={<CreateProjectPage />} />
         <Route path="notifications" element={<PlaceholderPage title="Notifications" />} />
         <Route path="tasks" element={<PlaceholderPage title="Tasks & Progress" />} />
-        <Route path="workforce" element={<PlaceholderPage title="Workforce" />} />
+        <Route path="workforce" element={<EmployeesPage />} />
         <Route path="inventory" element={<PlaceholderPage title="Materials & Inventory" />} />
         <Route path="procurement" element={<PlaceholderPage title="Procurement & Suppliers" />} />
         <Route path="finance" element={<PlaceholderPage title="Finance & Expenses" />} />
@@ -61,9 +71,28 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 
+      {/* HR Manager Suite */}
+      <Route
+        path="/hr"
+        element={
+          <RoleProtectedRoute allowedRoles={[USER_ROLES.HR_MANAGER, USER_ROLES.GENERAL_MANAGER]}>
+            <HRManagerLayout />
+          </RoleProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<HRDashboardPage />} />
+        <Route path="employees" element={<EmployeesPage />} />
+        <Route path="attendance" element={<AttendancePage />} />
+        <Route path="leaves" element={<LeaveRequestsPage />} />
+        <Route path="payroll" element={<PayrollPage />} />
+        <Route path="notifications" element={<HRNotificationsPage />} />
+        <Route path="settings" element={<HRSettingsPage />} />
+        <Route path="profile" element={<HRProfilePage />} />
+      </Route>
+
       {/* Other Role Dashboards */}
       <Route path="/project-manager/dashboard" element={<ProjectManagerDashboard />} />
-      <Route path="/hr/dashboard" element={<HRManagerDashboard />} />
       <Route path="/site-engineer/dashboard" element={<SiteEngineerDashboard />} />
       <Route path="/procurement/dashboard" element={<ProcurementDashboard />} />
       <Route path="/accountant/dashboard" element={<AccountantDashboard />} />
@@ -80,7 +109,9 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <AuthProvider>
-            <AppRoutes />
+            <NotificationProvider>
+              <AppRoutes />
+            </NotificationProvider>
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>

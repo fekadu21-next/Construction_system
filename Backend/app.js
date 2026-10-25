@@ -7,6 +7,8 @@ import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import hrRoutes from "./routes/hrRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 const app = express();
 
@@ -78,6 +80,12 @@ app.use("/api/projects", projectRoutes);
 
 // Dashboard routes (General Manager only)
 app.use("/api/general-manager", dashboardRoutes);
+
+// HR and workforce management routes (HR Manager and General Manager)
+app.use("/api/hr", hrRoutes);
+
+// Real-time notifications routes
+app.use("/api/notifications", notificationRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

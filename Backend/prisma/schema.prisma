@@ -110,11 +110,76 @@ model Project {
   projectManager User?            @relation("ProjectManager", fields: [projectManagerId], references: [id])
   createdBy       User            @relation("ProjectCreator", fields: [createdById], references: [id])
 
+  employees         Employee[]
+
   @@index([projectManagerId])
   @@index([createdById])
   @@index([status])
   @@index([archivedAt])
   @@map("projects")
+}
+
+model Employee {
+  id                String         @id @default(uuid())
+  employeeCode      String         @unique
+  fullName          String
+  phone             String
+  email             String?
+  trade             String         // CARPENTER, MASON, ELECTRICIAN, etc.
+  employmentType    String         @default("DAILY_LABORER") // FULL_TIME, CONTRACT, DAILY_LABORER
+  dailyRate         Decimal?       @db.Decimal(10, 2)
+  monthlySalary     Decimal?       @db.Decimal(10, 2)
+  currency          String         @default("ETB")
+  status            String         @default("ACTIVE") // ACTIVE, INACTIVE, ON_LEAVE
+  nationalId        String?
+  assignedProjectId String?
+  assignedProject   Project?       @relation(fields: [assignedProjectId], references: [id], onDelete: SetNull)
+  attendanceLogs    Attendance[]
+  leaveRequests     LeaveRequest[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([trade])
+  @@index([status])
+  @@index([assignedProjectId])
+  @@map("employees")
+}
+
+model Attendance {
+  id            String    @id @default(uuid())
+  employeeId    String
+  projectId     String?
+  date          DateTime  @db.Date
+  status        String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY, LATE
+  overtimeHours Decimal   @default(0.00) @db.Decimal(4, 2)
+  notes         String?
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([projectId])
+  @@index([date])
+  @@map("attendances")
+}
+
+model LeaveRequest {
+  id           String    @id @default(uuid())
+  employeeId   String
+  leaveType    String    // ANNUAL, SICK, EMERGENCY, UNPAID
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewerNote String?
+  reviewedById String?
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@map("leave_requests")
 }
 
 model AuditLog {
@@ -142,3 +207,23 @@ enum ProjectStatus {
   COMPLETED
   CANCELLED
 }
+
+model Notification {
+  id              String   @id @default(uuid())
+  recipientRole   String?
+  recipientUserId String?
+  title           String
+  message         String
+  type            String   @default("INFO") // INFO, WARNING, SUCCESS, ACTION
+  category        String   @default("GENERAL") // LEAVE, ATTENDANCE, WORKFORCE, PAYROLL
+  link            String?
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([recipientRole])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+

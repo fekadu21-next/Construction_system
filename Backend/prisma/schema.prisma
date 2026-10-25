@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                      String    @id @default(uuid())
+  fullName                String
+  email                   String    @unique
+  passwordHash            String
+  roleId                  String
+  isActive                Boolean   @default(true)
+  phone                   String?
+  emailVerifiedAt         DateTime?
+  emailVerificationToken   String?
+  emailVerificationExpiresAt DateTime?
+  mustChangePassword      Boolean   @default(false)
+  profilePhotoUrl         String?
+  createdById             String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  role                 Role              @relation(fields: [roleId], references: [id])
+  refreshSessions      RefreshSession[]
+  passwordResetTokens  PasswordResetToken[]
+  createdBy            User?             @relation("UserCreator", fields: [createdById], references: [id])
+  createdUsers         User[]            @relation("UserCreator")
+  managedProjects      Project[]         @relation("ProjectManager")
+  createdProjects      Project[]         @relation("ProjectCreator")
+  auditLogs            AuditLog[]
+
+  @@index([roleId])
+  @@index([isActive])
+  @@index([emailVerificationToken])
+  @@index([createdById])
+  @@map("users")
+}
+
+model RefreshSession {
+  id                 String    @id @default(uuid())
+  userId             String
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  replacedBySessionId String?   @unique
+  userAgent          String?
+  ipAddress          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy   RefreshSession? @relation("SessionReplacement", fields: [replacedBySessionId], references: [id])
+  replaces     RefreshSession? @relation("SessionReplacement")
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("refresh_sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Project {
+  id                String    @id @default(uuid())
+  projectName       String
+  projectCode       String    @unique
+  description       String?
+  location          String
+  startDate         DateTime
+  endDate           DateTime?
+  budget            Decimal   @db.Decimal(15, 2)
+  currency          String    @default("ETB")
+  status            ProjectStatus @default(PLANNED)
+  projectManagerId  String?
+  createdById       String
+  archivedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  projectManager User?            @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  createdBy       User            @relation("ProjectCreator", fields: [createdById], references: [id])
+
+  @@index([projectManagerId])
+  @@index([createdById])
+  @@index([status])
+  @@index([archivedAt])
+  @@map("projects")
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  details     Json?
+  createdAt   DateTime  @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}

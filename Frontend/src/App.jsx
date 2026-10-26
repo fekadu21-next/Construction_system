@@ -12,6 +12,8 @@ import HRManagerDashboard from "./pages/HRManagerDashboard.jsx";
 import SiteEngineerDashboard from "./pages/SiteEngineerDashboard.jsx";
 import ProcurementDashboard from "./pages/ProcurementDashboard.jsx";
 import AccountantDashboard from "./pages/AccountantDashboard.jsx";
+
+// General Manager
 import GeneralManagerLayout from "./layouts/GeneralManagerLayout.jsx";
 import DashboardPage from "./pages/general-manager/DashboardPage.jsx";
 import UsersPage from "./pages/general-manager/UsersPage.jsx";
@@ -20,6 +22,20 @@ import CreateProjectPage from "./pages/general-manager/CreateProjectPage.jsx";
 import SettingsPage from "./pages/general-manager/SettingsPage.jsx";
 import PlaceholderPage from "./pages/general-manager/PlaceholderPage.jsx";
 import ProfilePage from "./pages/general-manager/ProfilePage.jsx";
+
+// Project Manager
+import ProjectManagerLayout from "./layouts/ProjectManagerLayout.jsx";
+import PMDashboardPage from "./pages/project-manager/DashboardPage.jsx";
+import PMMyProjectsPage from "./pages/project-manager/MyProjectsPage.jsx";
+import PMMaterialRequestsPage from "./pages/project-manager/MaterialRequestsPage.jsx";
+import PMProgressReportsPage from "./pages/project-manager/ProgressReportsPage.jsx";
+import PMScheduleMilestonesPage from "./pages/project-manager/ScheduleMilestonesPage.jsx";
+import PMBudgetExpensesPage from "./pages/project-manager/BudgetExpensesPage.jsx";
+import PMReportsAnalyticsPage from "./pages/project-manager/ReportsAnalyticsPage.jsx";
+import PMNotificationsPage from "./pages/project-manager/NotificationsPage.jsx";
+import PMProfilePage from "./pages/project-manager/ProfilePage.jsx";
+import PMSettingsPage from "./pages/project-manager/SettingsPage.jsx";
+
 import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import { getDashboardRoute } from "./constants/roles.js";
@@ -62,8 +78,23 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 
+      {/* Project Manager Routes */}
+      <Route path="/project-manager" element={<ProjectManagerLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<PMDashboardPage />} />
+        <Route path="notifications" element={<PMNotificationsPage />} />
+        <Route path="projects" element={<PMMyProjectsPage />} />
+        <Route path="schedule" element={<PMScheduleMilestonesPage />} />
+        <Route path="milestones-tasks" element={<PMScheduleMilestonesPage />} />
+        <Route path="progress-reports" element={<PMProgressReportsPage />} />
+        <Route path="material-requests" element={<PMMaterialRequestsPage />} />
+        <Route path="budget-expenses" element={<PMBudgetExpensesPage />} />
+        <Route path="reports" element={<PMReportsAnalyticsPage />} />
+        <Route path="profile" element={<PMProfilePage />} />
+        <Route path="settings" element={<PMSettingsPage />} />
+      </Route>
+
       {/* Other Role Dashboards */}
-      <Route path="/project-manager/dashboard" element={<ProjectManagerDashboard />} />
       <Route path="/hr/dashboard" element={<HRManagerDashboard />} />
       <Route path="/site-engineer/dashboard" element={<SiteEngineerDashboard />} />
       <Route path="/procurement/dashboard" element={<ProcurementDashboard />} />

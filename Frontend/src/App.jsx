@@ -35,10 +35,26 @@ import PMReportsAnalyticsPage from "./pages/project-manager/ReportsAnalyticsPage
 import PMNotificationsPage from "./pages/project-manager/NotificationsPage.jsx";
 import PMProfilePage from "./pages/project-manager/ProfilePage.jsx";
 import PMSettingsPage from "./pages/project-manager/SettingsPage.jsx";
+import PMTasksAssignmentsPage from "./pages/project-manager/TasksAssignmentsPage.jsx";
+import PMWorkforceOverviewPage from "./pages/project-manager/WorkforceOverviewPage.jsx";
+import PMAiInsightsPage from "./pages/project-manager/AiInsightsPage.jsx";
+import PMMaterialTrackingPage from "./pages/project-manager/MaterialTrackingPage.jsx";
 
-import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
+// Site Engineer
+import SiteEngineerLayout from "./layouts/SiteEngineerLayout.jsx";
+import SEDashboardPage from "./pages/site-engineer/DashboardPage.jsx";
+import SEMyProjectsPage from "./pages/site-engineer/MyProjectsPage.jsx";
+import SEMyTasksPage from "./pages/site-engineer/MyTasksPage.jsx";
+import SEDailyActivitiesPage from "./pages/site-engineer/DailyActivitiesPage.jsx";
+import SEWorkerAttendancePage from "./pages/site-engineer/WorkerAttendancePage.jsx";
+import SEProgressReportsPage from "./pages/site-engineer/ProgressReportsPage.jsx";
+import SEMaterialRequestsPage from "./pages/site-engineer/MaterialRequestsPage.jsx";
+import SENotificationsPage from "./pages/site-engineer/NotificationsPage.jsx";
+import SEProfilePage from "./pages/site-engineer/ProfilePage.jsx";
+
+import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
-import { getDashboardRoute } from "./constants/roles.js";
+import { USER_ROLES, getDashboardRoute } from "./constants/roles.js";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -84,8 +100,12 @@ function AppRoutes() {
         <Route path="dashboard" element={<PMDashboardPage />} />
         <Route path="notifications" element={<PMNotificationsPage />} />
         <Route path="projects" element={<PMMyProjectsPage />} />
+        <Route path="tasks" element={<PMTasksAssignmentsPage />} />
+        <Route path="milestones-tasks" element={<PMTasksAssignmentsPage />} />
+        <Route path="workforce" element={<PMWorkforceOverviewPage />} />
+        <Route path="ai-insights" element={<PMAiInsightsPage />} />
+        <Route path="material-tracking" element={<PMMaterialTrackingPage />} />
         <Route path="schedule" element={<PMScheduleMilestonesPage />} />
-        <Route path="milestones-tasks" element={<PMScheduleMilestonesPage />} />
         <Route path="progress-reports" element={<PMProgressReportsPage />} />
         <Route path="material-requests" element={<PMMaterialRequestsPage />} />
         <Route path="budget-expenses" element={<PMBudgetExpensesPage />} />
@@ -96,7 +116,26 @@ function AppRoutes() {
 
       {/* Other Role Dashboards */}
       <Route path="/hr/dashboard" element={<HRManagerDashboard />} />
-      <Route path="/site-engineer/dashboard" element={<SiteEngineerDashboard />} />
+      {/* Site Engineer Routes */}
+      <Route
+        path="/site-engineer"
+        element={
+          <RoleProtectedRoute allowedRoles={[USER_ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout />
+          </RoleProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<SEDashboardPage />} />
+        <Route path="projects" element={<SEMyProjectsPage />} />
+        <Route path="tasks" element={<SEMyTasksPage />} />
+        <Route path="activities" element={<SEDailyActivitiesPage />} />
+        <Route path="attendance" element={<SEWorkerAttendancePage />} />
+        <Route path="progress-reports" element={<SEProgressReportsPage />} />
+        <Route path="material-requests" element={<SEMaterialRequestsPage />} />
+        <Route path="notifications" element={<SENotificationsPage />} />
+        <Route path="profile" element={<SEProfilePage />} />
+      </Route>
       <Route path="/procurement/dashboard" element={<ProcurementDashboard />} />
       <Route path="/accountant/dashboard" element={<AccountantDashboard />} />
 

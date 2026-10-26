@@ -49,12 +49,16 @@ model User {
   role                       Role                 @relation(fields: [roleId], references: [id])
 
   // Project Manager & Site Engineer relations
-  assignedMilestones Milestone[]       @relation("EngineerMilestones")
-  submittedReports   ProgressReport[]  @relation("EngineerReports")
-  reviewedReports    ProgressReport[]  @relation("PMReviewedReports")
-  requestedMaterials MaterialRequest[] @relation("RequestedMaterials")
-  reviewedMaterials  MaterialRequest[] @relation("ReviewedMaterials")
-  recordedExpenses   ProjectExpense[]  @relation("RecordedExpenses")
+  assignedMilestones   Milestone[]         @relation("EngineerMilestones")
+  submittedReports     ProgressReport[]    @relation("EngineerReports")
+  reviewedReports      ProgressReport[]    @relation("PMReviewedReports")
+  requestedMaterials   MaterialRequest[]   @relation("RequestedMaterials")
+  reviewedMaterials    MaterialRequest[]   @relation("ReviewedMaterials")
+  recordedExpenses     ProjectExpense[]    @relation("RecordedExpenses")
+  siteEngineerProjects Project[]           @relation("ProjectSiteEngineer")
+  assignedTasks        Task[]              @relation("AssignedTasks")
+  siteActivities       DailySiteActivity[] @relation("EngineerActivities")
+  recordedAttendances  attendances[]       @relation("RecordedAttendances")
 
   @@index([roleId])
   @@index([isActive])
@@ -110,6 +114,7 @@ model Project {
   budget           Decimal       @db.Decimal(15, 2)
   status           ProjectStatus @default(PLANNED)
   projectManagerId String?
+  siteEngineerId   String?
   createdById      String
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -118,14 +123,19 @@ model Project {
   employees        employees[]
   createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
   projectManager   User?         @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  siteEngineer     User?         @relation("ProjectSiteEngineer", fields: [siteEngineerId], references: [id])
 
   // Operational relations
   milestones       Milestone[]
+  tasks            Task[]
+  dailyActivities  DailySiteActivity[]
   progressReports  ProgressReport[]
   materialRequests MaterialRequest[]
   expenses         ProjectExpense[]
+  attendances      attendances[]
 
   @@index([projectManagerId])
+  @@index([siteEngineerId])
   @@index([createdById])
   @@index([status])
   @@index([archivedAt])
@@ -147,6 +157,7 @@ model Milestone {
 
   project          Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignedEngineer User?   @relation("EngineerMilestones", fields: [assignedEngineerId], references: [id])
+  tasks            Task[]
 
   @@index([projectId])
   @@index([dueDate])
@@ -265,20 +276,33 @@ model AuditLog {
 }
 
 model attendances {
-  id            String    @id
-  employeeId    String
-  projectId     String?
-  date          DateTime  @db.Date
-  status        String    @default("PRESENT")
-  overtimeHours Decimal   @default(0.00) @db.Decimal(4, 2)
-  notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @default(now())
-  employees     employees @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid())
+  employeeId       String
+  projectId        String?
+  date             DateTime  @db.Date
+  status           String    @default("PRESENT")
+  overtimeHours    Decimal   @default(0.00) @db.Decimal(4, 2)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now())
+  checkInTime      String?
+  checkOutTime     String?
+  workHours        Decimal?  @default(8.00) @db.Decimal(4, 2)
+  approvalStatus   String    @default("APPROVED")
+  recordedById     String?
+  reviewedById     String?
+  correctionReason String?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+
+  employees        employees @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project          Project?  @relation(fields: [projectId], references: [id])
+  recordedBy       User?     @relation("RecordedAttendances", fields: [recordedById], references: [id])
 
   @@unique([employeeId, date])
   @@index([date])
   @@index([projectId])
+  @@index([recordedById])
 }
 
 model employees {
@@ -448,4 +472,77 @@ enum RequestUrgency {
   NORMAL
   HIGH
   CRITICAL
+}
+
+
+model Task {
+  id              String        @id @default(uuid())
+  projectId       String
+  milestoneId     String?
+  assignedToId    String?
+  taskName        String
+  description     String?
+  priority        TaskPriority  @default(MEDIUM)
+  status          TaskStatus    @default(PENDING)
+  progressPercent Int           @default(0)
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  completionNotes String?
+  issues          String?
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone       Milestone?           @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  assignedTo      User?                @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  activities      DailySiteActivity[]
+
+  @@index([projectId])
+  @@index([milestoneId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+model DailySiteActivity {
+  id                  String   @id @default(uuid())
+  projectId           String
+  siteEngineerId      String
+  taskId              String?
+  activityDate        DateTime @db.Date
+  activityDescription String
+  workCompleted       String
+  laborCount          Int?
+  materialsUsed       String?
+  issues              String?
+  weatherConditions   String?
+  safetyObservations  String?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteEngineer        User     @relation("EngineerActivities", fields: [siteEngineerId], references: [id])
+  task                Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([siteEngineerId])
+  @@index([activityDate])
+  @@map("daily_site_activities")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }

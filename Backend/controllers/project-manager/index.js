@@ -5,3 +5,7 @@ export { pmProgressReportController } from "./progressReportController.js";
 export { pmMaterialRequestController } from "./materialRequestController.js";
 export { pmBudgetController } from "./budgetController.js";
 export { pmReportController } from "./reportController.js";
+export { pmTaskController } from "./taskController.js";
+export { pmWorkforceController } from "./workforceController.js";
+export { pmAiInsightsController } from "./aiInsightsController.js";
+export { pmMaterialTrackingController } from "./materialTrackingController.js";

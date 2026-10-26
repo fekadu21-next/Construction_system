@@ -5,3 +5,7 @@ export { pmProgressReportService } from "./progressReportService.js";
 export { pmMaterialRequestService } from "./materialRequestService.js";
 export { pmBudgetService } from "./budgetService.js";
 export { pmReportService } from "./reportService.js";
+export { pmTaskService } from "./taskService.js";
+export { pmWorkforceService } from "./workforceService.js";
+export { pmAiInsightsService } from "./aiInsightsService.js";
+export { pmMaterialTrackingService } from "./materialTrackingService.js";

@@ -32,6 +32,11 @@ const ROLES = [
     name: "ACCOUNTANT",
     description: "Handles financial records and expenses.",
   },
+  {
+    id: "supervisor-id",
+    name: "SUPERVISOR",
+    description: "Supervises site workforce and daily construction activities.",
+  },
 ];
 
 const GM_EMAIL = (process.env.SEED_GENERAL_MANAGER_EMAIL || "admin@gmail.com").toLowerCase().trim();
@@ -42,8 +47,8 @@ const GM_PHONE = "+251 911 234567";
 async function seed() {
   console.log("Starting seed process...");
 
-  // 1. Create or ensure all 6 system roles exist
-  console.log("\nEnsuring all 6 system roles exist...");
+  // 1. Create or ensure all system roles exist
+  console.log("\nEnsuring all system roles exist...");
   for (const role of ROLES) {
     await prisma.role.upsert({
       where: { name: role.name },

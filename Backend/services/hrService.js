@@ -1,6 +1,38 @@
 import { hrRepository } from "../repositories/hrRepository.js";
 import prisma from "../config/prisma.js";
 import { notificationService } from "./notificationService.js";
+import {
+  ATTENDANCE_STATUS,
+  ATTENDANCE_APPROVAL_STATUS,
+  ATTENDANCE_VALUE_RULES,
+} from "../constants/hrConstants.js";
+
+function calculateWorkHours(checkIn, checkOut, status) {
+  if (status === "ABSENT" || status === "ON_LEAVE" || status === "HOLIDAY" || status === "REST_DAY") {
+    return 0.0;
+  }
+  if (status === "HALF_DAY") {
+    return 4.0;
+  }
+  if (!checkIn || !checkOut) {
+    return ATTENDANCE_VALUE_RULES[status]?.defaultHours ?? 8.0;
+  }
+  const [inH, inM] = checkIn.split(":").map(Number);
+  const [outH, outM] = checkOut.split(":").map(Number);
+  if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) {
+    return 8.0;
+  }
+  let durationMinutes = (outH * 60 + outM) - (inH * 60 + inM);
+  if (durationMinutes < 0) {
+    durationMinutes += 24 * 60;
+  }
+  // Deduct 1 hour lunch/break if 5+ hours
+  if (durationMinutes >= 300) {
+    durationMinutes -= 60;
+  }
+  const hours = Math.max(0, durationMinutes / 60);
+  return Math.round(hours * 100) / 100;
+}
 
 export const hrService = {
   async generateNextEmployeeCode() {
@@ -239,15 +271,45 @@ export const hrService = {
     return result;
   },
 
-  async recordDailyAttendance(date, projectId, records, actorId) {
-    const formattedRecords = records.map((r) => ({
-      employeeId: r.employeeId,
-      projectId: projectId || r.projectId || null,
-      date,
-      status: r.status || "PRESENT",
-      overtimeHours: r.overtimeHours ? Number(r.overtimeHours) : 0,
-      notes: r.notes || null,
-    }));
+  async recordDailyAttendance(date, projectId, records, actorId, userRole = "HR_MANAGER", saveAction = "SAVE") {
+    const isManager = ["HR_MANAGER", "GENERAL_MANAGER"].includes(userRole);
+
+    let targetApprovalStatus = "APPROVED";
+    if (saveAction === "DRAFT") {
+      targetApprovalStatus = "DRAFT";
+    } else if (saveAction === "SUBMIT") {
+      targetApprovalStatus = "SUBMITTED";
+    } else if (!isManager) {
+      targetApprovalStatus = "SUBMITTED";
+    }
+
+    const formattedRecords = records.map((r) => {
+      const status = r.status || "PRESENT";
+      const checkInTime = r.checkInTime || null;
+      const checkOutTime = r.checkOutTime || null;
+      const workHours = r.workHours !== undefined && r.workHours !== null && r.workHours !== ""
+        ? Number(r.workHours)
+        : calculateWorkHours(checkInTime, checkOutTime, status);
+      const overtimeHours = r.overtimeHours ? Number(r.overtimeHours) : 0;
+
+      return {
+        employeeId: r.employeeId,
+        projectId: projectId && projectId !== "all" ? projectId : (r.projectId || null),
+        date,
+        status,
+        checkInTime,
+        checkOutTime,
+        workHours,
+        overtimeHours,
+        notes: r.notes || null,
+        approvalStatus: r.approvalStatus || targetApprovalStatus,
+        recordedById: actorId,
+        correctionReason: r.correctionReason || null,
+        submittedAt: targetApprovalStatus === "SUBMITTED" ? new Date() : (r.submittedAt ? new Date(r.submittedAt) : null),
+        reviewedById: targetApprovalStatus === "APPROVED" ? actorId : null,
+        reviewedAt: targetApprovalStatus === "APPROVED" ? new Date() : null,
+      };
+    });
 
     const result = await hrRepository.upsertAttendanceBatch(formattedRecords);
 
@@ -255,12 +317,13 @@ export const hrService = {
       await prisma.auditLog.create({
         data: {
           actorUserId: actorId,
-          action: "RECORD_ATTENDANCE",
+          action: saveAction === "SUBMIT" ? "SUBMIT_ATTENDANCE" : isManager ? "APPROVE_ATTENDANCE" : "RECORD_ATTENDANCE",
           entityType: "Attendance",
           details: {
             date,
             projectId: projectId || "ALL",
             recordCount: records.length,
+            approvalStatus: targetApprovalStatus,
           },
         },
       });
@@ -268,17 +331,28 @@ export const hrService = {
       console.warn("Audit log creation failed:", auditErr.message);
     }
 
-    // Trigger real-time notification
+    // Trigger real-time notifications
     try {
-      const highOvertimeWorkers = formattedRecords.filter((r) => r.overtimeHours >= 4);
-      await notificationService.createNotification({
-        title: "Site Attendance Logged",
-        message: `Daily attendance logged for ${records.length} worker(s) on ${date}`,
-        type: "INFO",
-        category: "ATTENDANCE",
-        link: "/hr/attendance",
-      });
+      if (targetApprovalStatus === "SUBMITTED") {
+        await notificationService.createNotification({
+          recipientRole: "HR_MANAGER",
+          title: "Attendance Submitted for Approval",
+          message: `Site attendance for ${records.length} workers on ${date} was submitted for review`,
+          type: "INFO",
+          category: "ATTENDANCE",
+          link: "/hr/attendance",
+        });
+      } else if (targetApprovalStatus === "APPROVED") {
+        await notificationService.createNotification({
+          title: "Attendance Sheet Verified",
+          message: `Daily attendance logged & verified for ${records.length} worker(s) on ${date}`,
+          type: "SUCCESS",
+          category: "ATTENDANCE",
+          link: "/hr/attendance",
+        });
+      }
 
+      const highOvertimeWorkers = formattedRecords.filter((r) => r.overtimeHours >= 4);
       if (highOvertimeWorkers.length > 0) {
         await notificationService.createNotification({
           title: "Overtime Threshold Alert",
@@ -292,7 +366,11 @@ export const hrService = {
       console.warn("Notification dispatch failed:", notifErr.message);
     }
 
-    return { count: result.length, date };
+    return {
+      count: result.length,
+      date,
+      approvalStatus: targetApprovalStatus,
+    };
   },
 
   async getDailyAttendance(date, projectId) {
@@ -302,55 +380,627 @@ export const hrService = {
       empWhere.assignedProjectId = projectId;
     }
 
-    const employees = await prisma.employee.findMany({
-      where: empWhere,
-      orderBy: { fullName: "asc" },
-      select: {
-        id: true,
-        employeeCode: true,
-        fullName: true,
-        trade: true,
-        phone: true,
-        dailyRate: true,
-        assignedProjectId: true,
-        assignedProject: {
-          select: {
-            id: true,
-            projectName: true,
+    const targetDateStart = new Date(date);
+    targetDateStart.setUTCHours(0, 0, 0, 0);
+    const targetDateEnd = new Date(date);
+    targetDateEnd.setUTCHours(23, 59, 59, 999);
+
+    const [employees, activeLeaves, attendanceLogs] = await Promise.all([
+      prisma.employee.findMany({
+        where: empWhere,
+        orderBy: { fullName: "asc" },
+        select: {
+          id: true,
+          employeeCode: true,
+          fullName: true,
+          trade: true,
+          phone: true,
+          dailyRate: true,
+          monthlySalary: true,
+          employmentType: true,
+          assignedProjectId: true,
+          assignedProject: {
+            select: {
+              id: true,
+              projectName: true,
+              projectCode: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.leaveRequest.findMany({
+        where: {
+          status: "APPROVED",
+          startDate: { lte: targetDateEnd },
+          endDate: { gte: targetDateStart },
+        },
+        select: {
+          employeeId: true,
+          leaveType: true,
+        },
+      }),
+      hrRepository.findAttendance({
+        date,
+        projectId: projectId && projectId !== "all" ? projectId : undefined,
+      }),
+    ]);
 
-    // 2. Fetch logged attendance for date
-    const attendanceLogs = await hrRepository.findAttendance({
-      date,
-      projectId: projectId && projectId !== "all" ? projectId : undefined,
-    });
+    const leaveMap = new Map();
+    activeLeaves.forEach((l) => leaveMap.set(l.employeeId, l));
 
     const logsMap = new Map();
     attendanceLogs.forEach((log) => {
       logsMap.set(log.employeeId, log);
     });
 
-    // 3. Merge so every relevant employee has an entry
+    // 2. Merge so every relevant employee has an entry
     const merged = employees.map((emp) => {
       const log = logsMap.get(emp.id);
+      const leave = leaveMap.get(emp.id);
+
+      const status = log ? log.status : leave ? "ON_LEAVE" : "PRESENT";
+      const checkInTime = log ? log.checkInTime : (status === "PRESENT" || status === "LATE" ? "08:00" : null);
+      const checkOutTime = log ? log.checkOutTime : (status === "PRESENT" ? "17:00" : status === "HALF_DAY" ? "12:00" : null);
+      const workHours = log && log.workHours !== null && log.workHours !== undefined
+        ? Number(log.workHours)
+        : calculateWorkHours(checkInTime, checkOutTime, status);
+      const overtimeHours = log ? Number(log.overtimeHours) : 0;
+      const notes = log ? (log.notes || "") : (leave ? `On approved ${leave.leaveType.toLowerCase()} leave` : "");
+      const approvalStatus = log ? (log.approvalStatus || "APPROVED") : "DRAFT";
+
       return {
+        id: log ? log.id : null,
         employee: emp,
-        status: log ? log.status : "PRESENT",
-        overtimeHours: log ? Number(log.overtimeHours) : 0,
-        notes: log ? log.notes : "",
+        status,
+        checkInTime,
+        checkOutTime,
+        workHours,
+        overtimeHours,
+        notes,
+        approvalStatus,
+        recordedById: log?.recordedById || null,
+        reviewedById: log?.reviewedById || null,
+        correctionReason: log?.correctionReason || null,
+        submittedAt: log?.submittedAt || null,
+        reviewedAt: log?.reviewedAt || null,
         isLogged: !!log,
+        isOnApprovedLeave: !!leave,
       };
     });
+
+    const presentCount = merged.filter((r) => r.status === "PRESENT").length;
+    const lateCount = merged.filter((r) => r.status === "LATE").length;
+    const halfDayCount = merged.filter((r) => r.status === "HALF_DAY").length;
+    const absentCount = merged.filter((r) => r.status === "ABSENT").length;
+    const onLeaveCount = merged.filter((r) => r.status === "ON_LEAVE").length;
+    const holidayCount = merged.filter((r) => r.status === "HOLIDAY").length;
+    const restDayCount = merged.filter((r) => r.status === "REST_DAY").length;
+    const totalOvertime = merged.reduce((sum, r) => sum + (Number(r.overtimeHours) || 0), 0);
+    const totalWorkHours = merged.reduce((sum, r) => sum + (Number(r.workHours) || 0), 0);
+
+    const workingWorkers = merged.filter((r) => !["HOLIDAY", "REST_DAY", "ON_LEAVE"].includes(r.status)).length;
+    const effectivePresent = presentCount + lateCount + halfDayCount * 0.5;
+    const attendancePercentage = workingWorkers > 0 ? Math.round((effectivePresent / workingWorkers) * 100) : 0;
+
+    let sheetStatus = "DRAFT";
+    if (attendanceLogs.length > 0) {
+      if (attendanceLogs.every((l) => l.approvalStatus === "APPROVED")) sheetStatus = "APPROVED";
+      else if (attendanceLogs.some((l) => l.approvalStatus === "REJECTED")) sheetStatus = "REJECTED";
+      else if (attendanceLogs.some((l) => l.approvalStatus === "SUBMITTED")) sheetStatus = "SUBMITTED";
+    }
 
     return {
       date,
       projectId: projectId || "all",
       totalWorkers: employees.length,
       loggedCount: attendanceLogs.length,
+      approvalStatus: sheetStatus,
+      summary: {
+        totalWorkers: employees.length,
+        workingWorkers,
+        presentCount,
+        lateCount,
+        halfDayCount,
+        absentCount,
+        onLeaveCount,
+        holidayCount,
+        restDayCount,
+        totalOvertime: Math.round(totalOvertime * 10) / 10,
+        totalWorkHours: Math.round(totalWorkHours * 10) / 10,
+        attendancePercentage,
+      },
       roster: merged,
+    };
+  },
+
+  async submitDailyAttendance(date, projectId, actorId) {
+    const where = {
+      date: new Date(date),
+    };
+    if (projectId && projectId !== "all") {
+      where.projectId = projectId;
+    }
+
+    const updated = await prisma.attendance.updateMany({
+      where,
+      data: {
+        approvalStatus: "SUBMITTED",
+        submittedAt: new Date(),
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: actorId,
+          action: "SUBMIT_ATTENDANCE_SHEET",
+          entityType: "Attendance",
+          details: { date, projectId: projectId || "ALL", count: updated.count },
+        },
+      });
+
+      await notificationService.createNotification({
+        recipientRole: "HR_MANAGER",
+        title: "Attendance Sheet Submitted",
+        message: `Attendance sheet for ${date} has been submitted for review (${updated.count} records)`,
+        type: "INFO",
+        category: "ATTENDANCE",
+        link: "/hr/attendance",
+      });
+    } catch (err) {
+      console.warn("Submit notification/audit failed:", err.message);
+    }
+
+    return { count: updated.count, status: "SUBMITTED", date };
+  },
+
+  async reviewDailyAttendance(date, projectId, { status, reviewerNote }, actorId) {
+    const updated = await hrRepository.updateBatchApprovalStatus({
+      date,
+      projectId,
+      approvalStatus: status,
+      reviewedById: actorId,
+      reviewerNote,
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: actorId,
+          action: status === "APPROVED" ? "APPROVE_ATTENDANCE" : "REJECT_ATTENDANCE",
+          entityType: "Attendance",
+          details: { date, projectId: projectId || "ALL", status, reviewerNote, count: updated.count },
+        },
+      });
+
+      await notificationService.createNotification({
+        title: `Attendance Sheet ${status === "APPROVED" ? "Approved" : "Returned for Correction"}`,
+        message: `Daily attendance on ${date} was marked as ${status.toLowerCase()}${reviewerNote ? `: ${reviewerNote}` : ""}`,
+        type: status === "APPROVED" ? "SUCCESS" : "WARNING",
+        category: "ATTENDANCE",
+        link: "/hr/attendance",
+      });
+    } catch (err) {
+      console.warn("Review notification/audit failed:", err.message);
+    }
+
+    return { count: updated.count, status, date };
+  },
+
+  async updateSingleAttendance(id, data, actorId, userRole) {
+    const existing = await hrRepository.findAttendanceById(id);
+    if (!existing) {
+      throw new Error("Attendance record not found");
+    }
+
+    const isManager = ["HR_MANAGER", "GENERAL_MANAGER"].includes(userRole);
+    if (existing.approvalStatus === "APPROVED" && !isManager) {
+      throw new Error("Only HR Managers can edit an approved attendance record");
+    }
+
+    const updateData = {};
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.checkInTime !== undefined) updateData.checkInTime = data.checkInTime;
+    if (data.checkOutTime !== undefined) updateData.checkOutTime = data.checkOutTime;
+    if (data.workHours !== undefined) updateData.workHours = Number(data.workHours);
+    if (data.overtimeHours !== undefined) updateData.overtimeHours = Number(data.overtimeHours);
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.approvalStatus !== undefined) updateData.approvalStatus = data.approvalStatus;
+    if (data.correctionReason !== undefined) updateData.correctionReason = data.correctionReason;
+
+    const updated = await hrRepository.updateAttendance(id, updateData);
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: actorId,
+          action: "UPDATE_ATTENDANCE_RECORD",
+          entityType: "Attendance",
+          entityId: id,
+          details: {
+            employeeCode: existing.employee?.employeeCode,
+            date: existing.date,
+            changes: updateData,
+            correctionReason: data.correctionReason || null,
+          },
+        },
+      });
+    } catch (auditErr) {
+      console.warn("Audit log creation failed:", auditErr.message);
+    }
+
+    return updated;
+  },
+
+  async getAttendanceDashboard({ projectId, date }) {
+    const targetDate = date ? new Date(date) : new Date();
+    targetDate.setUTCHours(0, 0, 0, 0);
+    const targetDateStr = targetDate.toISOString().split("T")[0];
+
+    // Today's daily attendance stats
+    const dailyData = await this.getDailyAttendance(targetDateStr, projectId);
+
+    // 14-day trends:
+    const daysTrend = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(targetDate);
+      d.setUTCDate(d.getUTCDate() - i);
+      const dStr = d.toISOString().split("T")[0];
+      const start = new Date(d);
+      start.setUTCHours(0, 0, 0, 0);
+
+      const logs = await prisma.attendance.findMany({
+        where: {
+          date: start,
+          ...(projectId && projectId !== "all" ? { projectId } : {}),
+        },
+        select: { status: true, overtimeHours: true, workHours: true },
+      });
+
+      const pCount = logs.filter((l) => l.status === "PRESENT").length;
+      const lCount = logs.filter((l) => l.status === "LATE").length;
+      const hCount = logs.filter((l) => l.status === "HALF_DAY").length;
+      const aCount = logs.filter((l) => l.status === "ABSENT").length;
+      const leaveCount = logs.filter((l) => l.status === "ON_LEAVE").length;
+      const totalWorkers = logs.length;
+      const effectivePresent = pCount + lCount + hCount * 0.5;
+      const rate = totalWorkers > 0 ? Math.round((effectivePresent / totalWorkers) * 100) : 0;
+
+      daysTrend.push({
+        date: dStr,
+        dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
+        present: pCount,
+        late: lCount,
+        halfDay: hCount,
+        absent: aCount,
+        onLeave: leaveCount,
+        total: totalWorkers,
+        rate,
+      });
+    }
+
+    // Project-wise attendance summary for targetDate
+    const allProjects = await prisma.project.findMany({
+      where: { archivedAt: null },
+      select: { id: true, projectName: true, projectCode: true, location: true },
+    });
+
+    const projectSummaries = await Promise.all(
+      allProjects.map(async (p) => {
+        const workersCount = await prisma.employee.count({
+          where: { assignedProjectId: p.id, status: { in: ["ACTIVE", "ON_LEAVE"] } },
+        });
+
+        const logs = await prisma.attendance.findMany({
+          where: { projectId: p.id, date: targetDate },
+          select: { status: true, approvalStatus: true },
+        });
+
+        const pCount = logs.filter((l) => l.status === "PRESENT").length;
+        const lCount = logs.filter((l) => l.status === "LATE").length;
+        const hCount = logs.filter((l) => l.status === "HALF_DAY").length;
+        const aCount = logs.filter((l) => l.status === "ABSENT").length;
+        const effective = pCount + lCount + hCount * 0.5;
+        const rate = workersCount > 0 ? Math.round((effective / workersCount) * 100) : (logs.length > 0 ? 100 : 0);
+
+        let status = "NO_DATA";
+        if (logs.length > 0) {
+          if (logs.every((l) => l.approvalStatus === "APPROVED")) status = "APPROVED";
+          else if (logs.some((l) => l.approvalStatus === "SUBMITTED")) status = "SUBMITTED";
+          else status = "DRAFT";
+        }
+
+        return {
+          id: p.id,
+          projectName: p.projectName,
+          projectCode: p.projectCode,
+          location: p.location,
+          assignedWorkers: workersCount,
+          present: pCount,
+          absent: aCount,
+          late: lCount,
+          halfDay: hCount,
+          attendanceRate: rate,
+          status,
+        };
+      })
+    );
+
+    // Pending approval sheets
+    const pendingSheets = await prisma.attendance.groupBy({
+      by: ["date", "projectId"],
+      where: { approvalStatus: "SUBMITTED" },
+      _count: true,
+      orderBy: { date: "desc" },
+    });
+
+    const formattedPending = await Promise.all(
+      pendingSheets.map(async (ps) => {
+        const proj = ps.projectId ? allProjects.find((p) => p.id === ps.projectId) : null;
+        return {
+          date: ps.date.toISOString().split("T")[0],
+          projectId: ps.projectId,
+          projectName: proj ? proj.projectName : "All Sites",
+          count: ps._count,
+        };
+      })
+    );
+
+    return {
+      date: targetDateStr,
+      projectId: projectId || "all",
+      kpis: dailyData.summary,
+      sheetStatus: dailyData.approvalStatus,
+      trend: daysTrend,
+      projectSummaries,
+      pendingApprovals: formattedPending,
+    };
+  },
+
+  async getAttendanceHistory({
+    page = 1,
+    limit = 20,
+    search = "",
+    projectId = "",
+    startDate = "",
+    endDate = "",
+    status = "",
+    employmentType = "",
+    sortBy = "date",
+    sortOrder = "desc",
+  }) {
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {};
+    if (projectId && projectId !== "all") {
+      where.projectId = projectId;
+    }
+    if (status && status !== "all") {
+      where.status = status;
+    }
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) where.date.gte = new Date(startDate);
+      if (endDate) where.date.lte = new Date(endDate);
+    }
+    if (employmentType && employmentType !== "all") {
+      where.employee = { ...(where.employee || {}), employmentType };
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.employee = {
+        ...(where.employee || {}),
+        OR: [
+          { fullName: { contains: q, mode: "insensitive" } },
+          { employeeCode: { contains: q, mode: "insensitive" } },
+          { phone: { contains: q, mode: "insensitive" } },
+        ],
+      };
+    }
+
+    const allowedSort = ["date", "status", "workHours", "overtimeHours", "createdAt"];
+    const sortField = allowedSort.includes(sortBy) ? sortBy : "date";
+    const sortDir = sortOrder?.toLowerCase() === "asc" ? "asc" : "desc";
+
+    const [records, total] = await Promise.all([
+      hrRepository.findAttendancePaginated({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: { [sortField]: sortDir },
+      }),
+      hrRepository.countAttendance({ where }),
+    ]);
+
+    return {
+      records,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 1,
+      },
+    };
+  },
+
+  async getWorkerAttendance(workerId, { startDate, endDate, month, year } = {}) {
+    const employee = await hrRepository.findEmployeeById(workerId);
+    if (!employee) {
+      throw new Error("Worker not found");
+    }
+
+    let dateWhere = {};
+    if (startDate || endDate) {
+      if (startDate) dateWhere.gte = new Date(startDate);
+      if (endDate) dateWhere.lte = new Date(endDate);
+    } else if (month && year) {
+      const m = parseInt(month, 10);
+      const y = parseInt(year, 10);
+      dateWhere.gte = new Date(Date.UTC(y, m - 1, 1));
+      dateWhere.lte = new Date(Date.UTC(y, m, 0, 23, 59, 59));
+    }
+
+    const logs = await prisma.attendance.findMany({
+      where: {
+        employeeId: workerId,
+        ...(Object.keys(dateWhere).length > 0 ? { date: dateWhere } : {}),
+      },
+      orderBy: { date: "desc" },
+      include: {
+        project: {
+          select: { projectName: true, projectCode: true },
+        },
+      },
+    });
+
+    let presentDays = 0;
+    let lateDays = 0;
+    let halfDays = 0;
+    let absentDays = 0;
+    let leaveDays = 0;
+    let totalWorkHours = 0;
+    let totalOvertimeHours = 0;
+
+    logs.forEach((l) => {
+      if (l.status === "PRESENT") presentDays++;
+      else if (l.status === "LATE") lateDays++;
+      else if (l.status === "HALF_DAY") halfDays++;
+      else if (l.status === "ABSENT") absentDays++;
+      else if (l.status === "ON_LEAVE") leaveDays++;
+
+      totalWorkHours += Number(l.workHours || 0);
+      totalOvertimeHours += Number(l.overtimeHours || 0);
+    });
+
+    const effectivePresent = presentDays + lateDays + halfDays * 0.5;
+    const workingDays = logs.length;
+    const rate = workingDays > 0 ? Math.round((effectivePresent / workingDays) * 100) : 0;
+
+    return {
+      worker: {
+        id: employee.id,
+        employeeCode: employee.employeeCode,
+        fullName: employee.fullName,
+        trade: employee.trade,
+        phone: employee.phone,
+        dailyRate: employee.dailyRate,
+        monthlySalary: employee.monthlySalary,
+        employmentType: employee.employmentType,
+        assignedProject: employee.assignedProject,
+      },
+      summary: {
+        totalLoggedDays: logs.length,
+        presentDays,
+        lateDays,
+        halfDays,
+        absentDays,
+        leaveDays,
+        effectivePresent,
+        attendanceRate: rate,
+        totalWorkHours: Math.round(totalWorkHours * 10) / 10,
+        totalOvertimeHours: Math.round(totalOvertimeHours * 10) / 10,
+      },
+      logs,
+    };
+  },
+
+  async getAttendanceReports({ startDate, endDate, projectId, month, year } = {}) {
+    const currentYear = year ? parseInt(year, 10) : new Date().getFullYear();
+    const currentMonth = month ? parseInt(month, 10) : new Date().getMonth() + 1;
+
+    let dateGte, dateLte;
+    if (startDate && endDate) {
+      dateGte = new Date(startDate);
+      dateLte = new Date(endDate);
+    } else {
+      dateGte = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
+      dateLte = new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59));
+    }
+
+    const empWhere = { status: { in: ["ACTIVE", "ON_LEAVE"] } };
+    if (projectId && projectId !== "all") {
+      empWhere.assignedProjectId = projectId;
+    }
+
+    const employees = await prisma.employee.findMany({
+      where: empWhere,
+      orderBy: { fullName: "asc" },
+      include: {
+        assignedProject: { select: { projectName: true, projectCode: true } },
+        attendanceLogs: {
+          where: {
+            date: { gte: dateGte, lte: dateLte },
+          },
+        },
+      },
+    });
+
+    const reportRows = employees.map((emp) => {
+      let present = 0;
+      let late = 0;
+      let halfDay = 0;
+      let absent = 0;
+      let onLeave = 0;
+      let totalWorkHours = 0;
+      let totalOvertimeHours = 0;
+
+      emp.attendanceLogs.forEach((l) => {
+        if (l.status === "PRESENT") present++;
+        else if (l.status === "LATE") late++;
+        else if (l.status === "HALF_DAY") halfDay++;
+        else if (l.status === "ABSENT") absent++;
+        else if (l.status === "ON_LEAVE") onLeave++;
+
+        totalWorkHours += Number(l.workHours || 0);
+        totalOvertimeHours += Number(l.overtimeHours || 0);
+      });
+
+      const effectiveDays = present + late + halfDay * 0.5;
+      const totalDays = emp.attendanceLogs.length;
+      const rate = totalDays > 0 ? Math.round((effectiveDays / totalDays) * 100) : 0;
+
+      return {
+        employeeId: emp.id,
+        employeeCode: emp.employeeCode,
+        fullName: emp.fullName,
+        trade: emp.trade,
+        employmentType: emp.employmentType,
+        assignedProject: emp.assignedProject?.projectName || "Unassigned",
+        presentDays: present,
+        lateDays: late,
+        halfDays: halfDay,
+        absentDays: absent,
+        leaveDays: onLeave,
+        effectiveDays,
+        totalWorkHours: Math.round(totalWorkHours * 10) / 10,
+        totalOvertimeHours: Math.round(totalOvertimeHours * 10) / 10,
+        attendanceRate: rate,
+      };
+    });
+
+    const totalWorkHours = reportRows.reduce((sum, r) => sum + r.totalWorkHours, 0);
+    const totalOT = reportRows.reduce((sum, r) => sum + r.totalOvertimeHours, 0);
+    const avgRate = reportRows.length > 0
+      ? Math.round(reportRows.reduce((sum, r) => sum + r.attendanceRate, 0) / reportRows.length)
+      : 0;
+
+    return {
+      period: {
+        startDate: dateGte.toISOString().split("T")[0],
+        endDate: dateLte.toISOString().split("T")[0],
+        month: currentMonth,
+        year: currentYear,
+      },
+      projectId: projectId || "all",
+      totalWorkers: reportRows.length,
+      overallSummary: {
+        totalWorkHours: Math.round(totalWorkHours * 10) / 10,
+        totalOvertimeHours: Math.round(totalOT * 10) / 10,
+        averageAttendanceRate: avgRate,
+      },
+      rows: reportRows,
     };
   },
 
@@ -509,7 +1159,7 @@ export const hrService = {
       let totalOvertimeHours = 0;
 
       emp.attendanceLogs.forEach((log) => {
-        if (log.status === "PRESENT") daysPresent += 1;
+        if (log.status === "PRESENT" || log.status === "LATE") daysPresent += 1;
         if (log.status === "HALF_DAY") daysHalfDay += 0.5;
         if (log.overtimeHours) totalOvertimeHours += Number(log.overtimeHours);
       });

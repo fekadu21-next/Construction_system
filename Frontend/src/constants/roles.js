@@ -5,6 +5,8 @@ export const USER_ROLES = {
   SITE_ENGINEER: "SITE_ENGINEER",
   PROCUREMENT_OFFICER: "PROCUREMENT_OFFICER",
   ACCOUNTANT: "ACCOUNTANT",
+  SUPERVISOR: "SUPERVISOR",
+  SUPERVISER: "SUPERVISOR",
 };
 
 export const ROLE_LABELS = {
@@ -14,6 +16,8 @@ export const ROLE_LABELS = {
   [USER_ROLES.SITE_ENGINEER]: "Site Engineer",
   [USER_ROLES.PROCUREMENT_OFFICER]: "Procurement Officer",
   [USER_ROLES.ACCOUNTANT]: "Accountant",
+  [USER_ROLES.SUPERVISOR]: "Supervisor",
+  SUPERVISER: "Supervisor",
 };
 
 export const ROLE_DASHBOARD_ROUTES = {
@@ -23,6 +27,8 @@ export const ROLE_DASHBOARD_ROUTES = {
   [USER_ROLES.SITE_ENGINEER]: "/site-engineer/dashboard",
   [USER_ROLES.PROCUREMENT_OFFICER]: "/procurement/dashboard",
   [USER_ROLES.ACCOUNTANT]: "/accountant/dashboard",
+  [USER_ROLES.SUPERVISOR]: "/supervisor/dashboard",
+  SUPERVISER: "/supervisor/dashboard",
 };
 
 export const getDashboardRoute = (role) => {

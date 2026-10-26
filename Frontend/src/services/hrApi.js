@@ -91,6 +91,76 @@ export const hrApi = {
     }
   },
 
+  async submitAttendance(data) {
+    try {
+      const response = await api.post("/api/hr/attendance/submit", data);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to submit attendance sheet";
+      return { success: false, error: message };
+    }
+  },
+
+  async reviewAttendance(data) {
+    try {
+      const response = await api.post("/api/hr/attendance/review", data);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to review attendance sheet";
+      return { success: false, error: message };
+    }
+  },
+
+  async updateAttendanceRecord(id, data) {
+    try {
+      const response = await api.patch(`/api/hr/attendance/${id}`, data);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to update attendance entry";
+      return { success: false, error: message };
+    }
+  },
+
+  async getAttendanceDashboard(params = {}) {
+    try {
+      const response = await api.get("/api/hr/attendance/dashboard", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch attendance dashboard";
+      return { success: false, error: message };
+    }
+  },
+
+  async getAttendanceHistory(params = {}) {
+    try {
+      const response = await api.get("/api/hr/attendance/history", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch attendance history";
+      return { success: false, error: message };
+    }
+  },
+
+  async getWorkerAttendance(workerId, params = {}) {
+    try {
+      const response = await api.get(`/api/hr/attendance/worker/${workerId}`, { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch worker attendance details";
+      return { success: false, error: message };
+    }
+  },
+
+  async getAttendanceReports(params = {}) {
+    try {
+      const response = await api.get("/api/hr/attendance/reports", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch attendance reports";
+      return { success: false, error: message };
+    }
+  },
+
   async getLeaves(params = {}) {
     try {
       const response = await api.get("/api/hr/leaves", { params });

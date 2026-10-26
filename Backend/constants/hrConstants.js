@@ -27,6 +27,25 @@ export const ATTENDANCE_STATUS = {
   HALF_DAY: "HALF_DAY",
   LATE: "LATE",
   ON_LEAVE: "ON_LEAVE",
+  HOLIDAY: "HOLIDAY",
+  REST_DAY: "REST_DAY",
+};
+
+export const ATTENDANCE_APPROVAL_STATUS = {
+  DRAFT: "DRAFT",
+  SUBMITTED: "SUBMITTED",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+};
+
+export const ATTENDANCE_VALUE_RULES = {
+  PRESENT: { dayValue: 1.0, isCountedPresent: true, defaultHours: 8.0 },
+  LATE: { dayValue: 1.0, isCountedPresent: true, defaultHours: 7.5 },
+  HALF_DAY: { dayValue: 0.5, isCountedPresent: true, defaultHours: 4.0 },
+  ABSENT: { dayValue: 0.0, isCountedPresent: false, defaultHours: 0.0 },
+  ON_LEAVE: { dayValue: 0.0, isCountedPresent: false, isLeave: true, defaultHours: 0.0 },
+  HOLIDAY: { dayValue: 0.0, isCountedPresent: false, isHoliday: true, defaultHours: 0.0 },
+  REST_DAY: { dayValue: 0.0, isCountedPresent: false, isRestDay: true, defaultHours: 0.0 },
 };
 
 export const LEAVE_STATUS = {

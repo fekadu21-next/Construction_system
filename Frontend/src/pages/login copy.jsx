@@ -102,10 +102,10 @@ export default function LoginPage() {
               <FeatureItem icon={<PerformanceIcon />} lines={["Track Progress", "& Performance"]} />
             </div>
 
-            {/* Six supported roles */}
+            {/* Seven supported roles */}
             <div className="mt-7 xl:mt-8">
               <h3 className="mb-3 text-[14px] font-semibold text-white xl:text-[15px]">
-                Our System Supports 6 Roles
+                Our System Supports 7 Roles
               </h3>
               <div className="grid max-w-[560px] grid-cols-3 gap-2.5 xl:gap-3">
                 <RoleCard icon={<RolePersonIcon />} label="General Manager" color="#168bff" />
@@ -114,6 +114,7 @@ export default function LoginPage() {
                 <RoleCard icon={<RolePersonIcon />} label="Accountant" color="#ffb347" />
                 <RoleCard icon={<RolePersonIcon />} label="Procurement Officer" color="#20d1de" />
                 <RoleCard icon={<RolePersonIcon />} label="Site Engineer" color="#ff606b" />
+                <RoleCard icon={<RolePersonIcon />} label="Supervisor" color="#14b8a6" />
               </div>
             </div>
           </div>

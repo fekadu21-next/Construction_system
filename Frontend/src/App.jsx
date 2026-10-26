@@ -13,6 +13,7 @@ import HRManagerDashboard from "./pages/HRManagerDashboard.jsx";
 import SiteEngineerDashboard from "./pages/SiteEngineerDashboard.jsx";
 import ProcurementDashboard from "./pages/ProcurementDashboard.jsx";
 import AccountantDashboard from "./pages/AccountantDashboard.jsx";
+import SupervisorDashboard from "./pages/SupervisorDashboard.jsx";
 import GeneralManagerLayout from "./layouts/GeneralManagerLayout.jsx";
 import DashboardPage from "./pages/general-manager/DashboardPage.jsx";
 import UsersPage from "./pages/general-manager/UsersPage.jsx";
@@ -96,6 +97,7 @@ function AppRoutes() {
       <Route path="/site-engineer/dashboard" element={<SiteEngineerDashboard />} />
       <Route path="/procurement/dashboard" element={<ProcurementDashboard />} />
       <Route path="/accountant/dashboard" element={<AccountantDashboard />} />
+      <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
 
       <Route path="/" element={<Navigate to={user ? getDashboardRoute(user.role) || "/login" : "/login"} replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />

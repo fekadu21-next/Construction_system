@@ -111,6 +111,7 @@ model Project {
   createdBy       User            @relation("ProjectCreator", fields: [createdById], references: [id])
 
   employees         Employee[]
+  attendances       Attendance[]
 
   @@index([projectManagerId])
   @@index([createdById])
@@ -146,20 +147,32 @@ model Employee {
 }
 
 model Attendance {
-  id            String    @id @default(uuid())
-  employeeId    String
-  projectId     String?
-  date          DateTime  @db.Date
-  status        String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY, LATE
-  overtimeHours Decimal   @default(0.00) @db.Decimal(4, 2)
-  notes         String?
-  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  employeeId       String
+  projectId        String?
+  date             DateTime  @db.Date
+  status           String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY, LATE, ON_LEAVE, HOLIDAY, REST_DAY
+  checkInTime      String?   // e.g. "08:00"
+  checkOutTime     String?   // e.g. "17:00"
+  workHours        Decimal   @default(8.00) @db.Decimal(4, 2)
+  overtimeHours    Decimal   @default(0.00) @db.Decimal(4, 2)
+  notes            String?
+  approvalStatus   String    @default("APPROVED") // DRAFT, SUBMITTED, APPROVED, REJECTED
+  recordedById     String?
+  reviewedById     String?
+  correctionReason String?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project          Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@unique([employeeId, date])
   @@index([projectId])
   @@index([date])
+  @@index([approvalStatus])
   @@map("attendances")
 }
 

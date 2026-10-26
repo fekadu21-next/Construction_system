@@ -150,7 +150,7 @@ export const validateRecordAttendance = (req, res, next) => {
   if (isNaN(parsedDate.getTime())) {
     return res.status(400).json({
       success: false,
-      message: "Invalid attendance date",
+      message: "Invalid attendance date format (YYYY-MM-DD expected)",
       field: "date",
     });
   }
@@ -163,6 +163,8 @@ export const validateRecordAttendance = (req, res, next) => {
     });
   }
 
+  const seenEmployees = new Set();
+
   for (let i = 0; i < records.length; i++) {
     const item = records[i];
     if (!item.employeeId) {
@@ -173,11 +175,121 @@ export const validateRecordAttendance = (req, res, next) => {
       });
     }
 
+    if (seenEmployees.has(item.employeeId)) {
+      return res.status(400).json({
+        success: false,
+        message: `Duplicate attendance entry detected for employee ID ${item.employeeId} at index ${i}`,
+        field: `records[${i}].employeeId`,
+      });
+    }
+    seenEmployees.add(item.employeeId);
+
     if (item.status && !Object.values(ATTENDANCE_STATUS).includes(item.status)) {
       return res.status(400).json({
         success: false,
         message: `Invalid attendance status '${item.status}' at index ${i}. Allowed: ${Object.values(ATTENDANCE_STATUS).join(", ")}`,
         field: `records[${i}].status`,
+      });
+    }
+
+    if (item.workHours !== undefined && item.workHours !== null && item.workHours !== "") {
+      const wh = Number(item.workHours);
+      if (isNaN(wh) || wh < 0 || wh > 24) {
+        return res.status(400).json({
+          success: false,
+          message: `Work hours must be a number between 0 and 24 at index ${i}`,
+          field: `records[${i}].workHours`,
+        });
+      }
+    }
+
+    if (item.overtimeHours !== undefined && item.overtimeHours !== null && item.overtimeHours !== "") {
+      const ot = Number(item.overtimeHours);
+      if (isNaN(ot) || ot < 0 || ot > 16) {
+        return res.status(400).json({
+          success: false,
+          message: `Overtime hours must be a number between 0 and 16 at index ${i}`,
+          field: `records[${i}].overtimeHours`,
+        });
+      }
+    }
+  }
+
+  next();
+};
+
+export const validateSubmitAttendance = (req, res, next) => {
+  const { date } = req.body || {};
+  if (!date) {
+    return res.status(400).json({
+      success: false,
+      message: "Attendance date is required to submit sheet",
+      field: "date",
+    });
+  }
+
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid attendance date format",
+      field: "date",
+    });
+  }
+
+  next();
+};
+
+export const validateReviewAttendance = (req, res, next) => {
+  const { date, status } = req.body || {};
+  if (!date) {
+    return res.status(400).json({
+      success: false,
+      message: "Attendance date is required for review",
+      field: "date",
+    });
+  }
+
+  if (!status || !["APPROVED", "REJECTED"].includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message: "Review status must be either APPROVED or REJECTED",
+      field: "status",
+    });
+  }
+
+  next();
+};
+
+export const validateUpdateSingleAttendance = (req, res, next) => {
+  const { status, workHours, overtimeHours } = req.body || {};
+
+  if (status && !Object.values(ATTENDANCE_STATUS).includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid attendance status. Allowed: ${Object.values(ATTENDANCE_STATUS).join(", ")}`,
+      field: "status",
+    });
+  }
+
+  if (workHours !== undefined && workHours !== null) {
+    const wh = Number(workHours);
+    if (isNaN(wh) || wh < 0 || wh > 24) {
+      return res.status(400).json({
+        success: false,
+        message: "Work hours must be a number between 0 and 24",
+        field: "workHours",
+      });
+    }
+  }
+
+  if (overtimeHours !== undefined && overtimeHours !== null) {
+    const ot = Number(overtimeHours);
+    if (isNaN(ot) || ot < 0 || ot > 16) {
+      return res.status(400).json({
+        success: false,
+        message: "Overtime hours must be a number between 0 and 16",
+        field: "overtimeHours",
       });
     }
   }

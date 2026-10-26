@@ -129,7 +129,7 @@ export const userService = {
       totalUsers,
       activeUsers,
       inactiveUsers,
-      rolesCount: rolesCount || 6,
+      rolesCount: rolesCount || 7,
       breakdown,
     };
   },
@@ -225,17 +225,19 @@ export const userService = {
       throw new Error("Email already exists");
     }
 
-    // Resolve role by id or role name
+    // Resolve role by id or role name (with SUPERVISER alias support)
     let role = null;
-    if (data.roleId) {
+    const resolvedRoleId = data.roleId === "SUPERVISER" ? "SUPERVISOR" : data.roleId;
+    const resolvedRoleName = data.role === "SUPERVISER" ? "SUPERVISOR" : data.role;
+    if (resolvedRoleId) {
       role = await prisma.role.findFirst({
         where: {
-          OR: [{ id: data.roleId }, { name: data.roleId }],
+          OR: [{ id: resolvedRoleId }, { name: resolvedRoleId }],
         },
       });
-    } else if (data.role) {
+    } else if (resolvedRoleName) {
       role = await prisma.role.findUnique({
-        where: { name: data.role },
+        where: { name: resolvedRoleName },
       });
     }
 
@@ -339,7 +341,8 @@ export const userService = {
 
     // Role update safeguard: Cannot demote the last active General Manager
     if (data.roleId || data.role) {
-      const targetRoleIdentifier = data.roleId || data.role;
+      const rawIdentifier = data.roleId || data.role;
+      const targetRoleIdentifier = rawIdentifier === "SUPERVISER" ? "SUPERVISOR" : rawIdentifier;
       const targetRole = await prisma.role.findFirst({
         where: {
           OR: [{ id: targetRoleIdentifier }, { name: targetRoleIdentifier }],

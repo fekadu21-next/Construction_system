@@ -112,27 +112,70 @@ export const hrRepository = {
           },
           update: {
             status: record.status,
+            checkInTime: record.checkInTime ?? null,
+            checkOutTime: record.checkOutTime ?? null,
+            workHours: record.workHours !== undefined ? Number(record.workHours) : 8.00,
             overtimeHours: record.overtimeHours ? Number(record.overtimeHours) : 0,
             notes: record.notes ?? null,
             projectId: record.projectId ?? null,
+            approvalStatus: record.approvalStatus ?? "APPROVED",
+            correctionReason: record.correctionReason ?? null,
+            ...(record.recordedById ? { recordedById: record.recordedById } : {}),
+            ...(record.reviewedById ? { reviewedById: record.reviewedById, reviewedAt: new Date() } : {}),
+            ...(record.submittedAt ? { submittedAt: new Date(record.submittedAt) } : {}),
           },
           create: {
             employeeId: record.employeeId,
             projectId: record.projectId ?? null,
             date: new Date(record.date),
             status: record.status ?? "PRESENT",
+            checkInTime: record.checkInTime ?? null,
+            checkOutTime: record.checkOutTime ?? null,
+            workHours: record.workHours !== undefined ? Number(record.workHours) : 8.00,
             overtimeHours: record.overtimeHours ? Number(record.overtimeHours) : 0,
             notes: record.notes ?? null,
+            approvalStatus: record.approvalStatus ?? "APPROVED",
+            recordedById: record.recordedById ?? null,
+            correctionReason: record.correctionReason ?? null,
+            submittedAt: record.submittedAt ? new Date(record.submittedAt) : null,
           },
         })
       )
     );
   },
 
-  async findAttendance({ projectId, date, startDate, endDate, employeeId }) {
+  async findAttendanceById(id) {
+    return prisma.attendance.findUnique({
+      where: { id },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            fullName: true,
+            trade: true,
+            phone: true,
+            employmentType: true,
+            dailyRate: true,
+            monthlySalary: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            projectName: true,
+            projectCode: true,
+          },
+        },
+      },
+    });
+  },
+
+  async findAttendance({ projectId, date, startDate, endDate, employeeId, approvalStatus }) {
     const where = {};
     if (projectId) where.projectId = projectId;
     if (employeeId) where.employeeId = employeeId;
+    if (approvalStatus) where.approvalStatus = approvalStatus;
     if (date) {
       where.date = new Date(date);
     } else if (startDate || endDate) {
@@ -152,10 +195,87 @@ export const hrRepository = {
             fullName: true,
             trade: true,
             phone: true,
+            employmentType: true,
             dailyRate: true,
           },
         },
+        project: {
+          select: {
+            id: true,
+            projectName: true,
+            projectCode: true,
+          },
+        },
       },
+    });
+  },
+
+  async findAttendancePaginated({ where = {}, skip = 0, take = 20, orderBy = { date: "desc" } }) {
+    return prisma.attendance.findMany({
+      where,
+      skip,
+      take,
+      orderBy,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            fullName: true,
+            trade: true,
+            phone: true,
+            employmentType: true,
+            dailyRate: true,
+            monthlySalary: true,
+            assignedProjectId: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            projectName: true,
+            projectCode: true,
+          },
+        },
+      },
+    });
+  },
+
+  async countAttendance({ where = {} }) {
+    return prisma.attendance.count({ where });
+  },
+
+  async updateAttendance(id, data) {
+    return prisma.attendance.update({
+      where: { id },
+      data,
+      include: {
+        employee: true,
+        project: true,
+      },
+    });
+  },
+
+  async updateBatchApprovalStatus({ date, projectId, approvalStatus, reviewedById, reviewerNote }) {
+    const where = {
+      date: new Date(date),
+    };
+    if (projectId && projectId !== "all") {
+      where.projectId = projectId;
+    }
+
+    const data = {
+      approvalStatus,
+      reviewedById,
+      reviewedAt: new Date(),
+    };
+    if (reviewerNote) {
+      data.notes = reviewerNote;
+    }
+
+    return prisma.attendance.updateMany({
+      where,
+      data,
     });
   },
 

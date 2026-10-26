@@ -40,14 +40,14 @@ export default function HRManagerLayout() {
   };
 
   const navItems = [
-    { label: "Overview", path: "/hr/dashboard", icon: "📊" },
-    { label: "Workforce Roster", path: "/hr/employees", icon: "👷" },
-    { label: "Daily Attendance", path: "/hr/attendance", icon: "⏱️" },
-    { label: "Leave Requests", path: "/hr/leaves", icon: "🏖️" },
-    { label: "Labor & Payroll", path: "/hr/payroll", icon: "💵" },
-    { label: "Notifications", path: "/hr/notifications", icon: "🔔", badge: unreadCount },
-    { label: "Settings", path: "/hr/settings", icon: "⚙️" },
-    { label: "My Profile", path: "/hr/profile", icon: "👤" },
+    { label: t("overview") || "Overview", path: "/hr/dashboard", icon: "📊" },
+    { label: t("workforceRoster") || "Workforce Roster", path: "/hr/employees", icon: "👷" },
+    { label: t("dailyAttendance") || "Daily Attendance", path: "/hr/attendance", icon: "⏱️" },
+    { label: t("leaveRequests") || "Leave Requests", path: "/hr/leaves", icon: "🏖️" },
+    { label: t("laborAndPayroll") || "Labor & Payroll", path: "/hr/payroll", icon: "💵" },
+    { label: t("notifications") || "Notifications", path: "/hr/notifications", icon: "🔔", badge: unreadCount },
+    { label: t("settings") || "Settings", path: "/hr/settings", icon: "⚙️" },
+    { label: t("profile") || "My Profile", path: "/hr/profile", icon: "👤" },
   ];
 
   return (
@@ -62,13 +62,11 @@ export default function HRManagerLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col transition-all duration-300 transform lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col border-r transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shrink-0 ${
           isDark
-            ? "bg-[#0f172a] border-r border-slate-800 text-slate-200"
-            : "bg-white border-r border-slate-200 text-slate-700 shadow-sm"
-        }`}
+            ? "bg-[#0f172a] border-slate-800 text-slate-200"
+            : "bg-white border-slate-200 text-slate-700 shadow-sm"
+        } ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Brand Header */}
         <div className={`h-16 flex items-center justify-between px-6 border-b ${isDark ? "border-slate-800" : "border-slate-100"}`}>
@@ -80,11 +78,11 @@ export default function HRManagerLayout() {
               <div className="text-base font-bold tracking-tight flex items-center gap-1.5">
                 BuildManage
                 <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
-                  HR Suite
+                  {t("hrSuite") || "HR Suite"}
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                <span>Workforce & HR</span>
+                <span>{t("workforceAndHr") || "Workforce & HR"}</span>
                 {connected && (
                   <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-medium">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -105,7 +103,7 @@ export default function HRManagerLayout() {
         {/* Navigation Items */}
         <nav className="flex-1 overflow-y-auto px-4 py-5 space-y-1.5">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 pb-2">
-            Workforce Management
+            {t("workforceManagement") || "Workforce Management"}
           </div>
           {navItems.map((item) => (
             <NavLink
@@ -149,7 +147,7 @@ export default function HRManagerLayout() {
             </div>
             <button
               onClick={handleLogout}
-              title="Logout"
+              title={t("logout") || "Logout"}
               className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
             >
               🚪
@@ -159,13 +157,13 @@ export default function HRManagerLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 lg:pl-72 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
         <header
-          className={`sticky top-0 z-30 h-16 px-4 lg:px-8 flex items-center justify-between border-b transition-colors duration-200 ${
+          className={`sticky top-0 z-30 h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between border-b transition-colors duration-200 ${
             isDark
-              ? "bg-[#0b1329]/80 border-slate-800 backdrop-blur-md"
-              : "bg-white/80 border-slate-200 backdrop-blur-md shadow-xs"
+              ? "bg-[#0b1329]/90 border-slate-800 backdrop-blur-md"
+              : "bg-white/95 border-slate-200 backdrop-blur-md shadow-xs"
           }`}
         >
           <div className="flex items-center gap-3">
@@ -176,17 +174,42 @@ export default function HRManagerLayout() {
               ☰
             </button>
             <div className="hidden sm:flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <span>Human Resources Portal</span>
+              <span>{t("hrPortalTitle") || "Human Resources Portal"}</span>
               {connected && (
                 <span className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-medium">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  Real-time Active
+                  {t("realTimeActive") || "Real-time Active"}
                 </span>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Language Switcher (English / Amharic) */}
+            <div className="flex items-center rounded-xl p-1 border transition-colors bg-slate-100/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => setLanguage("en")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                  language === "en"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-300 hover:text-blue-600"
+                }`}
+                title="Switch to English"
+              >
+                🇺🇸 EN
+              </button>
+              <button
+                onClick={() => setLanguage("am")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                  language === "am"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-300 hover:text-blue-600"
+                }`}
+                title="ወደ አማርኛ ቀይር"
+              >
+                🇪🇹 አማ
+              </button>
+            </div>
             {/* Real-time Notifications Bell Dropdown */}
             <div className="relative" ref={notifMenuRef}>
               <button
@@ -212,7 +235,7 @@ export default function HRManagerLayout() {
                 >
                   <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm">Notifications</span>
+                      <span className="font-bold text-sm">{t("notifications") || "Notifications"}</span>
                       {unreadCount > 0 && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-500">
                           {unreadCount} unread
@@ -224,7 +247,7 @@ export default function HRManagerLayout() {
                         onClick={markAllAsRead}
                         className="text-xs text-emerald-500 hover:text-emerald-600 font-medium"
                       >
-                        Mark all read
+                        {t("markAllRead") || "Mark all read"}
                       </button>
                     )}
                   </div>
@@ -232,7 +255,7 @@ export default function HRManagerLayout() {
                   <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
                     {notifications.length === 0 ? (
                       <div className="p-6 text-center text-xs text-slate-400">
-                        No notifications yet
+                        {t("noNotificationsYet") || "No notifications yet"}
                       </div>
                     ) : (
                       notifications.slice(0, 5).map((n) => (
@@ -281,7 +304,7 @@ export default function HRManagerLayout() {
                       onClick={() => setNotifMenuOpen(false)}
                       className="text-xs text-emerald-500 hover:text-emerald-600 font-semibold block py-1"
                     >
-                      View all notifications →
+                      {t("viewAllNotifications") || "View all notifications →"}
                     </NavLink>
                   </div>
                 </div>
@@ -291,7 +314,7 @@ export default function HRManagerLayout() {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              title={isDark ? (t("themeLight") || "Switch to Light Mode") : (t("themeDark") || "Switch to Dark Mode")}
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               {isDark ? "☀️" : "🌙"}
@@ -327,13 +350,13 @@ export default function HRManagerLayout() {
                     onClick={() => setProfileMenuOpen(false)}
                     className="block px-4 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
-                    👤 My Profile
+                    👤 {t("profile") || "My Profile"}
                   </NavLink>
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                   >
-                    🚪 Logout
+                    🚪 {t("logout") || "Logout"}
                   </button>
                 </div>
               )}
@@ -342,7 +365,7 @@ export default function HRManagerLayout() {
         </header>
 
         {/* Main Body */}
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <Outlet />
         </main>
       </div>

@@ -183,21 +183,22 @@ export const hrController = {
 
   async recordAttendance(req, res, next) {
     try {
-      const { date, projectId, records } = req.body;
+      const { date, projectId, records, saveAction } = req.body;
       const actorId = req.userId;
+      const userRole = req.userRole;
 
-      const result = await hrService.recordDailyAttendance(date, projectId, records, actorId);
+      const result = await hrService.recordDailyAttendance(date, projectId, records, actorId, userRole, saveAction);
 
       res.json({
         success: true,
         data: result,
-        message: `Attendance recorded for ${result.count} workers`,
+        message: `Attendance saved for ${result.count} worker(s) (${result.approvalStatus})`,
       });
     } catch (error) {
       console.error("Record attendance error:", error);
       res.status(500).json({
         success: false,
-        message: "Unable to record site attendance",
+        message: error.message || "Unable to record site attendance",
       });
     }
   },
@@ -218,6 +219,149 @@ export const hrController = {
       res.status(500).json({
         success: false,
         message: "Unable to fetch attendance records",
+      });
+    }
+  },
+
+  async submitDailyAttendance(req, res, next) {
+    try {
+      const { date, projectId } = req.body;
+      const actorId = req.userId;
+
+      const result = await hrService.submitDailyAttendance(date, projectId, actorId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Attendance sheet for ${date} submitted for review`,
+      });
+    } catch (error) {
+      console.error("Submit attendance error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Unable to submit attendance sheet",
+      });
+    }
+  },
+
+  async reviewDailyAttendance(req, res, next) {
+    try {
+      const { date, projectId, status, reviewerNote } = req.body;
+      const actorId = req.userId;
+
+      const result = await hrService.reviewDailyAttendance(date, projectId, { status, reviewerNote }, actorId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Attendance sheet for ${date} marked as ${status.toLowerCase()}`,
+      });
+    } catch (error) {
+      console.error("Review attendance error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Unable to review attendance sheet",
+      });
+    }
+  },
+
+  async updateSingleAttendance(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actorId = req.userId;
+      const userRole = req.userRole;
+
+      const updated = await hrService.updateSingleAttendance(id, req.body, actorId, userRole);
+
+      res.json({
+        success: true,
+        data: updated,
+        message: "Attendance entry updated successfully",
+      });
+    } catch (error) {
+      if (error.message === "Attendance record not found") {
+        return res.status(404).json({ success: false, message: error.message });
+      }
+      if (error.message.includes("Only HR Managers")) {
+        return res.status(403).json({ success: false, message: error.message });
+      }
+      console.error("Update single attendance error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Unable to update attendance record",
+      });
+    }
+  },
+
+  async getAttendanceDashboard(req, res, next) {
+    try {
+      const { date, projectId } = req.query;
+      const data = await hrService.getAttendanceDashboard({ date, projectId });
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      console.error("Get attendance dashboard error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to load attendance dashboard data",
+      });
+    }
+  },
+
+  async getAttendanceHistory(req, res, next) {
+    try {
+      const result = await hrService.getAttendanceHistory(req.query);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error("Get attendance history error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to fetch attendance history",
+      });
+    }
+  },
+
+  async getWorkerAttendance(req, res, next) {
+    try {
+      const { workerId } = req.params;
+      const result = await hrService.getWorkerAttendance(workerId, req.query);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      if (error.message === "Worker not found") {
+        return res.status(404).json({ success: false, message: error.message });
+      }
+      console.error("Get worker attendance error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to fetch worker attendance history",
+      });
+    }
+  },
+
+  async getAttendanceReports(req, res, next) {
+    try {
+      const result = await hrService.getAttendanceReports(req.query);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error("Get attendance reports error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to generate attendance reports",
       });
     }
   },

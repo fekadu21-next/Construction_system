@@ -1,5 +1,33 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Package,
+  FileText,
+  DollarSign,
+  TrendingUp,
+  Search,
+  Check,
+  X,
+  ArrowRight,
+  Eye,
+  RefreshCw,
+  MapPin,
+  Camera,
+  ClipboardList,
+  AlertCircle,
+  BarChart3,
+  HardHat,
+  CheckSquare,
+  Users,
+  BrainCircuit,
+  Boxes,
+  Sparkles,
+} from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { projectManagerService } from "../../services/projectManagerService.js";
@@ -198,8 +226,8 @@ export default function DashboardPage() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 mb-1">
-              <span>🏗️</span>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20 mb-1">
+              <Building2 className="w-3.5 h-3.5" />
               <span>Project Management Operations</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
@@ -213,9 +241,9 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 shrink-0">
             <a
               href="#my-projects-section"
-              className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/25 transition-all transform active:scale-95"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/25 transition-all hover:scale-[1.02]"
             >
-              <span>📊</span>
+              <BarChart3 className="w-4 h-4" />
               <span>VIEW MY PROJECTS</span>
             </a>
           </div>
@@ -251,8 +279,8 @@ export default function DashboardPage() {
                 Under active management
               </span>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-blue-500/10 text-blue-600 dark:text-cyan-400 flex items-center justify-center text-2xl shadow-xs">
-              🏗️
+            <div className="h-12 w-12 rounded-xl bg-blue-500/10 text-blue-600 dark:text-cyan-400 flex items-center justify-center shadow-xs">
+              <Building2 className="w-6 h-6" />
             </div>
           </div>
         </div>
@@ -282,8 +310,8 @@ export default function DashboardPage() {
                 Active site construction
               </span>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl shadow-xs">
-              ⚡
+            <div className="h-12 w-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs">
+              <TrendingUp className="w-6 h-6" />
             </div>
           </div>
         </div>
@@ -313,8 +341,8 @@ export default function DashboardPage() {
                 Requires schedule review
               </span>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center text-2xl shadow-xs">
-              ⚠️
+            <div className="h-12 w-12 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shadow-xs">
+              <AlertTriangle className="w-6 h-6" />
             </div>
           </div>
         </div>
@@ -343,11 +371,108 @@ export default function DashboardPage() {
                 Material requests awaiting PM
               </span>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl shadow-xs">
-              📦
+            <div className="h-12 w-12 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-xs">
+              <Package className="w-6 h-6" />
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ========================================================
+          INTEGRATED PROJECT WORKFLOW & OPERATIONS HUB
+      ========================================================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Feature 1: Tasks & Assignments */}
+        <Link
+          to="/project-manager/tasks"
+          className={`p-5 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg group ${
+            isDark
+              ? "bg-[#0d1c33] border-slate-800 hover:border-blue-500/60"
+              : "bg-white border-slate-200 hover:border-blue-300 shadow-xs"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-10 w-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
+          </div>
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-blue-400 transition-colors">
+            Tasks & Assignments
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+            Create tasks, assign workers, set deadlines, and track construction progress.
+          </p>
+        </Link>
+
+        {/* Feature 2: Workforce Overview */}
+        <Link
+          to="/project-manager/workforce"
+          className={`p-5 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg group ${
+            isDark
+              ? "bg-[#0d1c33] border-slate-800 hover:border-emerald-500/60"
+              : "bg-white border-slate-200 hover:border-emerald-300 shadow-xs"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Users className="w-5 h-5" />
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
+          </div>
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-emerald-400 transition-colors">
+            Workforce Overview
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+            Monitor worker assignments, trade allocations, and live on-site attendance.
+          </p>
+        </Link>
+
+        {/* Feature 3: AI Insights */}
+        <Link
+          to="/project-manager/ai-insights"
+          className={`p-5 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg group ${
+            isDark
+              ? "bg-[#0d1c33] border-slate-800 hover:border-purple-500/60"
+              : "bg-white border-slate-200 hover:border-purple-300 shadow-xs"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-10 w-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <BrainCircuit className="w-5 h-5" />
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+          </div>
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-purple-400 transition-colors">
+            AI Insights & Risk
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+            Predictive delay models, cost overrun forecasting, and actionable advice.
+          </p>
+        </Link>
+
+        {/* Feature 4: Material Usage & Tracking */}
+        <Link
+          to="/project-manager/material-tracking"
+          className={`p-5 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg group ${
+            isDark
+              ? "bg-[#0d1c33] border-slate-800 hover:border-amber-500/60"
+              : "bg-white border-slate-200 hover:border-amber-300 shadow-xs"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Boxes className="w-5 h-5" />
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+          </div>
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-amber-400 transition-colors">
+            Material Usage & Stock
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+            Review site materials logged by Site Engineers and compare planned vs actual.
+          </p>
+        </Link>
       </div>
 
       {/* ========================================================
@@ -360,7 +485,7 @@ export default function DashboardPage() {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-xl">📊</span>
+            <BarChart3 className="w-5 h-5 text-blue-600 dark:text-cyan-400" />
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
               My Projects by Status
             </h2>
@@ -375,7 +500,7 @@ export default function DashboardPage() {
             className="text-xs sm:text-sm font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
           >
             <span>View All Projects</span>
-            <span>→</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
@@ -392,7 +517,7 @@ export default function DashboardPage() {
           >
             <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Planned</span>
-              <span>📋</span>
+              <ClipboardList className="w-4 h-4" />
             </p>
             <p className="text-2xl font-black text-blue-700 dark:text-blue-300 mt-2">
               {data?.statusCounts?.PLANNED || 0}
@@ -411,7 +536,7 @@ export default function DashboardPage() {
           >
             <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider flex items-center justify-between">
               <span>In Progress</span>
-              <span>⚡</span>
+              <TrendingUp className="w-4 h-4" />
             </p>
             <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300 mt-2">
               {data?.statusCounts?.IN_PROGRESS || 0}
@@ -430,7 +555,7 @@ export default function DashboardPage() {
           >
             <p className="text-xs text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider flex items-center justify-between">
               <span>On Hold</span>
-              <span>⏸️</span>
+              <Clock className="w-4 h-4" />
             </p>
             <p className="text-2xl font-black text-amber-700 dark:text-amber-300 mt-2">
               {data?.statusCounts?.ON_HOLD || 0}
@@ -449,7 +574,7 @@ export default function DashboardPage() {
           >
             <p className="text-xs text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Completed</span>
-              <span>✅</span>
+              <CheckCircle2 className="w-4 h-4" />
             </p>
             <p className="text-2xl font-black text-purple-700 dark:text-purple-300 mt-2">
               {data?.statusCounts?.COMPLETED || 0}
@@ -468,7 +593,7 @@ export default function DashboardPage() {
           >
             <p className="text-xs text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider flex items-center justify-between">
               <span>Delayed</span>
-              <span>⚠️</span>
+              <AlertTriangle className="w-4 h-4" />
             </p>
             <p className="text-2xl font-black text-rose-700 dark:text-rose-300 mt-2">
               {data?.statusCounts?.DELAYED || 0}
@@ -490,7 +615,8 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>🏗️</span> My Assigned Projects
+              <Building2 className="w-5 h-5 text-blue-600 dark:text-cyan-400" />
+              <span>My Assigned Projects</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Detailed tracking of construction progress, assigned site engineers, and expenditure.
@@ -500,7 +626,7 @@ export default function DashboardPage() {
           {/* Search bar inside projects section */}
           <div className="flex items-center gap-3">
             <div className="relative w-full sm:w-64">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
               <input
                 type="text"
                 placeholder="Search projects, site engineer..."
@@ -525,8 +651,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Projects List / Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto [scrollbar-width:thin]">
+          <table className="w-full text-left text-sm min-w-[760px]">
             <thead
               className={`text-xs font-bold uppercase tracking-wider ${
                 isDark ? "bg-slate-900/60 text-slate-400" : "bg-slate-50 text-slate-500"
@@ -546,7 +672,7 @@ export default function DashboardPage() {
               {filteredProjects.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-slate-500">
-                    <span className="text-3xl">🏗️</span>
+                    <Building2 className="w-10 h-10 mx-auto text-slate-400 mb-2 opacity-70" />
                     <p className="text-sm font-bold mt-2">No projects match the selected criteria</p>
                     <p className="text-xs text-slate-400 mt-1">Try resetting the status filter or search query</p>
                     <button
@@ -554,7 +680,7 @@ export default function DashboardPage() {
                         setStatusFilter("ALL");
                         setSearchQuery("");
                       }}
-                      className="mt-3 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700"
+                      className="mt-3 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-sm"
                     >
                       Show All Projects
                     </button>
@@ -593,7 +719,8 @@ export default function DashboardPage() {
                               {project.projectCode}
                             </span>
                             <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate max-w-[200px]">
-                              <span>📍</span> {project.location}
+                              <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{project.location}</span>
                             </span>
                           </div>
                         </div>
@@ -642,7 +769,8 @@ export default function DashboardPage() {
                           {formatDate(project.startDate)}
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                          <span>🏁</span> to {formatDate(project.expectedEndDate)}
+                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>to {formatDate(project.expectedEndDate)}</span>
                         </div>
                       </td>
 
@@ -676,9 +804,10 @@ export default function DashboardPage() {
                       <td className="px-4 py-4 whitespace-nowrap text-right">
                         <button
                           onClick={() => setSelectedProject(project)}
-                          className="px-3 py-1.5 rounded-xl border border-blue-500/30 text-blue-600 dark:text-cyan-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-xs font-bold transition-all shadow-xs"
+                          className="px-3 py-1.5 rounded-xl border border-blue-500/30 text-blue-600 dark:text-cyan-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1"
                         >
-                          View Details
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Details</span>
                         </button>
                       </td>
                     </tr>
@@ -702,13 +831,15 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>🎯</span> Upcoming Milestones
+              <Clock className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
+              <span>Upcoming Milestones</span>
             </h2>
             <Link
               to="/project-manager/milestones-tasks"
-              className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline"
+              className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
             >
-              All milestones →
+              <span>All milestones</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
@@ -780,13 +911,15 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>📑</span> Recent Progress Reports
+              <FileText className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
+              <span>Recent Progress Reports</span>
             </h2>
             <Link
               to="/project-manager/progress-reports"
-              className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline"
+              className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
             >
-              View all reports →
+              <span>View all reports</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
@@ -822,20 +955,23 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-2 text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-950/40 p-2.5 rounded-lg border border-slate-200/50 dark:border-slate-800/80">
-                  <p className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    📈 {report.reportedProgress}
+                  <p className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>{report.reportedProgress}</span>
                   </p>
                   {report.issuesOrDelays && (
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-1 line-clamp-2">
-                      ⚠️ <span className="font-medium">Issues:</span> {report.issuesOrDelays}
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-1 line-clamp-2 flex items-start gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      <span><span className="font-medium">Issues:</span> {report.issuesOrDelays}</span>
                     </p>
                   )}
                 </div>
 
                 <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
                   <span>Submitted: {formatDate(report.submissionDate)}</span>
-                  <span className="font-semibold text-blue-600 dark:text-cyan-400">
-                    View full details & notes →
+                  <span className="font-semibold text-blue-600 dark:text-cyan-400 flex items-center gap-1">
+                    <span>View full details & notes</span>
+                    <ArrowRight className="w-3 h-3" />
                   </span>
                 </div>
               </div>
@@ -856,7 +992,8 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>📦</span> Pending Material Requests
+              <Package className="w-5 h-5 text-blue-600 dark:text-cyan-400" />
+              <span>Pending Material Requests</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Review and authorize Site Engineer procurement requisitions according to project budget and urgency.
@@ -865,16 +1002,17 @@ export default function DashboardPage() {
 
           <Link
             to="/project-manager/material-requests"
-            className="text-xs sm:text-sm font-bold text-blue-600 dark:text-cyan-400 hover:underline"
+            className="text-xs sm:text-sm font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
           >
-            All Material Requests →
+            <span>All Material Requests</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         <div className="space-y-4">
           {(data?.pendingMaterialRequests || []).length === 0 ? (
             <div className="p-8 text-center text-slate-500">
-              <span className="text-3xl">✓</span>
+              <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500 mb-2 opacity-80" />
               <p className="text-sm font-bold mt-2 text-slate-700 dark:text-slate-300">
                 All material requisitions have been processed!
               </p>
@@ -925,8 +1063,9 @@ export default function DashboardPage() {
                       </div>
 
                       {/* Materials List */}
-                      <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 leading-snug">
-                        🛠️ {req.requestedMaterials}
+                      <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 leading-snug flex items-center gap-1.5">
+                        <Package className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span>{req.requestedMaterials}</span>
                       </p>
 
                       <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
@@ -953,15 +1092,17 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-2.5 shrink-0">
                         <button
                           onClick={() => setActionRequest({ request: req, type: "REJECT" })}
-                          className="px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 text-xs font-bold transition-all"
+                          className="px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
                         >
-                          ✕ Reject
+                          <X className="w-3.5 h-3.5" />
+                          <span>Reject</span>
                         </button>
                         <button
                           onClick={() => setActionRequest({ request: req, type: "APPROVE" })}
-                          className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/30 transition-all transform active:scale-95"
+                          className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/30 transition-all transform active:scale-95 inline-flex items-center gap-1.5"
                         >
-                          ✓ Approve Request
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve Request</span>
                         </button>
                       </div>
                     ) : (
@@ -990,7 +1131,8 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>💰</span> Budget Overview & Expenditure Control
+              <DollarSign className="w-5 h-5 text-blue-600 dark:text-cyan-400" />
+              <span>Budget Overview & Expenditure Control</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Comparative visualization of allocated project budgets vs actual construction expenditures.
@@ -999,9 +1141,10 @@ export default function DashboardPage() {
 
           <Link
             to="/project-manager/budget-expenses"
-            className="text-xs sm:text-sm font-bold text-blue-600 dark:text-cyan-400 hover:underline"
+            className="text-xs sm:text-sm font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
           >
-            Detailed Ledger & Audit →
+            <span>Detailed Ledger & Audit</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
@@ -1142,21 +1285,24 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between border-b pb-4 border-slate-200 dark:border-slate-800">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">🏗️</span>
+                  <Building2 className="w-5 h-5 text-blue-600 dark:text-cyan-400" />
                   <h3 className="text-lg font-bold">{selectedProject.projectName}</h3>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="font-mono text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-cyan-300 font-bold">
                     {selectedProject.projectCode}
                   </span>
-                  <span className="text-xs text-slate-500">📍 {selectedProject.location}</span>
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-slate-400" />
+                    <span>{selectedProject.location}</span>
+                  </span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedProject(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl font-bold p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1241,9 +1387,9 @@ export default function DashboardPage() {
               </div>
               <button
                 onClick={() => setSelectedReport(null)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1273,7 +1419,10 @@ export default function DashboardPage() {
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-center">
                   <span className="text-[10px] text-slate-400 uppercase font-bold">Photos</span>
-                  <p className="font-semibold text-xs mt-0.5">📸 {selectedReport.photosAttached || 0} Attached</p>
+                  <p className="font-semibold text-xs mt-0.5 flex items-center justify-center gap-1">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{selectedReport.photosAttached || 0} Attached</span>
+                  </p>
                 </div>
               </div>
             </div>
@@ -1283,16 +1432,17 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelectedReport(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 font-bold text-xs"
+                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 font-bold text-xs"
                 >
                   Close
                 </button>
                 {selectedReport.reviewStatus !== "Reviewed" && (
                   <button
                     onClick={() => handleReviewReport(selectedReport.id)}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md inline-flex items-center gap-1.5"
                   >
-                    ✓ Mark as Reviewed
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Mark as Reviewed</span>
                   </button>
                 )}
               </div>
@@ -1314,7 +1464,11 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between border-b pb-3 border-slate-200 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold flex items-center gap-2">
-                  <span>{actionRequest.type === "APPROVE" ? "✅" : "🛑"}</span>
+                  {actionRequest.type === "APPROVE" ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-rose-500" />
+                  )}
                   <span>
                     {actionRequest.type === "APPROVE" ? "Approve Material Request" : "Reject Material Request"}
                   </span>
@@ -1325,9 +1479,9 @@ export default function DashboardPage() {
               </div>
               <button
                 onClick={() => setActionRequest(null)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 

@@ -367,6 +367,152 @@ export const projectManagerService = {
   },
 
   /**
+   * Get project tasks (Feature 1: Tasks & Assignments)
+   * Calls: GET /api/project-manager/tasks
+   */
+  async getTasks(params = {}) {
+    try {
+      const response = await api.get("/api/project-manager/tasks", { params });
+      return response.data;
+    } catch (err) {
+      console.warn("API getTasks failed, returning fallback empty list:", err.message);
+      return {
+        success: true,
+        data: { tasks: [], total: 0, page: 1, limit: 50, projects: [] },
+      };
+    }
+  },
+
+  /**
+   * Get assignees for task creation
+   * Calls: GET /api/project-manager/tasks/assignees
+   */
+  async getAssignees(projectId = "") {
+    try {
+      const response = await api.get("/api/project-manager/tasks/assignees", {
+        params: projectId ? { projectId } : {},
+      });
+      return response.data;
+    } catch (err) {
+      console.warn("API getAssignees failed:", err.message);
+      return { success: true, data: { users: [], employees: [] } };
+    }
+  },
+
+  /**
+   * Create task
+   * Calls: POST /api/project-manager/tasks
+   */
+  async createTask(taskData) {
+    try {
+      const response = await api.post("/api/project-manager/tasks", taskData);
+      return response.data;
+    } catch (err) {
+      return {
+        success: false,
+        message: err.response?.data?.message || err.message || "Failed to create task",
+      };
+    }
+  },
+
+  /**
+   * Update task
+   * Calls: PATCH /api/project-manager/tasks/:taskId
+   */
+  async updateTask(taskId, updateData) {
+    try {
+      const response = await api.patch(`/api/project-manager/tasks/${taskId}`, updateData);
+      return response.data;
+    } catch (err) {
+      return {
+        success: false,
+        message: err.response?.data?.message || err.message || "Failed to update task",
+      };
+    }
+  },
+
+  /**
+   * Delete task
+   * Calls: DELETE /api/project-manager/tasks/:taskId
+   */
+  async deleteTask(taskId) {
+    try {
+      const response = await api.delete(`/api/project-manager/tasks/${taskId}`);
+      return response.data;
+    } catch (err) {
+      return {
+        success: false,
+        message: err.response?.data?.message || err.message || "Failed to delete task",
+      };
+    }
+  },
+
+  /**
+   * Get workforce overview (Feature 2)
+   * Calls: GET /api/project-manager/workforce
+   */
+  async getWorkforce(params = {}) {
+    try {
+      const response = await api.get("/api/project-manager/workforce", { params });
+      return response.data;
+    } catch (err) {
+      console.warn("API getWorkforce failed:", err.message);
+      return {
+        success: true,
+        data: {
+          workers: [],
+          summary: { totalWorkers: 0, activeOnSiteToday: 0, onLeaveToday: 0, availableOffDuty: 0, tradesCount: 0, tradeBreakdown: {} },
+          projects: [],
+        },
+      };
+    }
+  },
+
+  /**
+   * Get AI insights (Feature 3)
+   * Calls: GET /api/project-manager/ai-insights
+   */
+  async getAiInsights(params = {}) {
+    try {
+      const response = await api.get("/api/project-manager/ai-insights", { params });
+      return response.data;
+    } catch (err) {
+      console.warn("API getAiInsights failed:", err.message);
+      return {
+        success: true,
+        data: {
+          insights: [],
+          summary: { analyzedProjects: 0, highRiskCount: 0, moderateRiskCount: 0, onTrackCount: 0, averageConfidence: 0 },
+          projects: [],
+        },
+      };
+    }
+  },
+
+  /**
+   * Get material usage & tracking (Feature 4)
+   * Calls: GET /api/project-manager/material-tracking
+   */
+  async getMaterialTracking(params = {}) {
+    try {
+      const response = await api.get("/api/project-manager/material-tracking", { params });
+      return response.data;
+    } catch (err) {
+      console.warn("API getMaterialTracking failed:", err.message);
+      return {
+        success: true,
+        data: {
+          dailyUsageLogs: [],
+          requisitionComparison: [],
+          inventoryStock: [],
+          summary: { totalUsageLogs: 0, totalApprovedRequests: 0, inventoryItemsTracked: 0, lowStockAlerts: 0 },
+          projects: [],
+        },
+      };
+    }
+  },
+
+  /**
    * Reset fallback store to initial demo state
    */
   async resetMockData() {

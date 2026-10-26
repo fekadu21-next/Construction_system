@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 
@@ -29,7 +30,8 @@ export default function ProfilePage() {
 
       {success && (
         <div className="p-4 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2">
-          <span>✓</span> {success}
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>{success}</span>
         </div>
       )}
 
@@ -93,7 +95,7 @@ export default function ProfilePage() {
           <div className="pt-2">
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
             >
               Save Profile Changes
             </button>

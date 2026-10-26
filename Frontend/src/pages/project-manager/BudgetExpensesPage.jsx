@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft, DollarSign, PieChart, Building2, TrendingUp, Wallet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { projectManagerService } from "../../services/projectManagerService.js";
 
@@ -128,7 +129,8 @@ export default function BudgetExpensesPage() {
             }`}
           >
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <span>📊</span> Cost Category Breakdown
+              <PieChart className="w-5 h-5 text-blue-500" />
+              <span>Cost Category Breakdown</span>
             </h2>
 
             {/* Stacked Bar */}
@@ -177,11 +179,12 @@ export default function BudgetExpensesPage() {
             }`}
           >
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <span>🏗️</span> Project-by-Project Ledger
+              <Building2 className="w-5 h-5 text-blue-500" />
+              <span>Project-by-Project Ledger</span>
             </h2>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto [scrollbar-width:thin]">
+              <table className="w-full min-w-[720px] text-left text-sm">
                 <thead
                   className={`text-xs font-bold uppercase tracking-wider ${
                     isDark ? "bg-slate-900/60 text-slate-400" : "bg-slate-50 text-slate-500"

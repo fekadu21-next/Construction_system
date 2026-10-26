@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Bell, CheckCheck, ArrowLeft, AlertCircle, Package, Target, Info, CheckCircle2 } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { projectManagerService } from "../../services/projectManagerService.js";
 
@@ -55,15 +56,17 @@ export default function NotificationsPage() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={markAllRead}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-cyan-400 text-xs font-bold hover:bg-blue-100 transition-colors shadow-xs"
           >
-            Mark all read
+            <CheckCheck className="w-3.5 h-3.5" />
+            <span>Mark all read</span>
           </button>
           <Link
             to="/project-manager/dashboard"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-colors shadow-xs"
           >
-            ← Overview
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Overview</span>
           </Link>
         </div>
       </div>
@@ -92,8 +95,16 @@ export default function NotificationsPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3.5 min-w-0">
-                  <div className="text-2xl mt-0.5">
-                    {n.priority === "critical" ? "🚨" : n.type === "material_request" ? "📦" : n.type === "milestone" ? "🎯" : "ℹ️"}
+                  <div className="mt-0.5 shrink-0">
+                    {n.priority === "critical" ? (
+                      <AlertCircle className="w-5 h-5 text-rose-500" />
+                    ) : n.type === "material_request" ? (
+                      <Package className="w-5 h-5 text-blue-500" />
+                    ) : n.type === "milestone" ? (
+                      <Target className="w-5 h-5 text-indigo-500" />
+                    ) : (
+                      <Info className="w-5 h-5 text-slate-400" />
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">

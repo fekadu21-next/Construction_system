@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Search, FileText, CheckCircle2, AlertTriangle, TrendingUp, Sun, Users, Camera, Eye, Check, X } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { projectManagerService } from "../../services/projectManagerService.js";
 
@@ -97,7 +98,7 @@ export default function ProgressReportsPage() {
         }`}
       >
         <div className="relative w-full sm:w-80">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
           <input
             type="text"
             placeholder="Search report title, engineer, project..."
@@ -120,7 +121,7 @@ export default function ProgressReportsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center rounded-2xl border bg-white dark:bg-[#0d1c33] border-slate-200 dark:border-slate-800 text-slate-500">
-          <span className="text-4xl">📑</span>
+          <FileText className="w-10 h-10 text-slate-400 mx-auto mb-2" />
           <p className="text-base font-bold text-slate-800 dark:text-slate-200 mt-2">No progress reports found</p>
           <p className="text-xs text-slate-400 mt-1">Check back later or adjust your search filter</p>
         </div>
@@ -161,12 +162,14 @@ export default function ProgressReportsPage() {
                   </p>
 
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 space-y-1.5">
-                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      📈 {r.reportedProgress}
+                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{r.reportedProgress}</span>
                     </p>
                     {r.issuesOrDelays && (
-                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
-                        ⚠️ <span className="font-semibold">Issues:</span> {r.issuesOrDelays}
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                        <span><strong className="font-semibold">Issues:</strong> {r.issuesOrDelays}</span>
                       </p>
                     )}
                   </div>
@@ -175,15 +178,21 @@ export default function ProgressReportsPage() {
                   <div className="grid grid-cols-3 gap-2 text-center text-xs">
                     <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80">
                       <span className="text-[10px] text-slate-400 uppercase font-bold block">Weather</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{r.weatherConditions || "Clear"}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1 mt-0.5">
+                        <Sun className="w-3 h-3 text-amber-500" /> {r.weatherConditions || "Clear"}
+                      </span>
                     </div>
                     <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80">
                       <span className="text-[10px] text-slate-400 uppercase font-bold block">Site Crew</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{r.laborCount || "—"} Workers</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1 mt-0.5">
+                        <Users className="w-3 h-3 text-blue-500" /> {r.laborCount || "—"} Workers
+                      </span>
                     </div>
                     <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80">
                       <span className="text-[10px] text-slate-400 uppercase font-bold block">Photos</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">📸 {r.photosAttached || 0}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1 mt-0.5">
+                        <Camera className="w-3 h-3 text-emerald-500" /> {r.photosAttached || 0}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -191,16 +200,18 @@ export default function ProgressReportsPage() {
                 <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <button
                     onClick={() => setSelectedReport(r)}
-                    className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline"
                   >
-                    View Full Report
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>View Full Report</span>
                   </button>
                   {r.reviewStatus !== "Reviewed" && (
                     <button
                       onClick={() => handleReview(r.id)}
-                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs"
+                      className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
                     >
-                      ✓ Mark Reviewed
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Mark Reviewed</span>
                     </button>
                   )}
                 </div>
@@ -227,9 +238,9 @@ export default function ProgressReportsPage() {
               </div>
               <button
                 onClick={() => setSelectedReport(null)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -268,9 +279,10 @@ export default function ProgressReportsPage() {
                 {selectedReport.reviewStatus !== "Reviewed" && (
                   <button
                     onClick={() => handleReview(selectedReport.id)}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
                   >
-                    ✓ Acknowledge & Mark Reviewed
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Acknowledge & Mark Reviewed</span>
                   </button>
                 )}
               </div>

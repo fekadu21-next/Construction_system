@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Clock, BarChart3, ShieldCheck, Zap, Activity, ArrowLeft } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { projectManagerService } from "../../services/projectManagerService.js";
 
@@ -25,10 +26,10 @@ export default function ReportsAnalyticsPage() {
   };
 
   const kpis = [
-    { title: "Schedule Performance Index (SPI)", value: "1.04", status: "On Track / Optimal", icon: "⏱️", color: "text-emerald-600" },
-    { title: "Cost Performance Index (CPI)", value: "0.98", status: "Within Tolerance", icon: "📊", color: "text-blue-600" },
-    { title: "Lost Time Injury Frequency", value: "0.0", status: "Perfect Safety Record", icon: "🛡️", color: "text-emerald-600" },
-    { title: "Avg Material Approval Time", value: "3.4 hrs", status: "High Agility", icon: "⚡", color: "text-purple-600" },
+    { title: "Schedule Performance Index (SPI)", value: "1.04", status: "On Track / Optimal", icon: Clock, color: "text-emerald-600 dark:text-emerald-400" },
+    { title: "Cost Performance Index (CPI)", value: "0.98", status: "Within Tolerance", icon: BarChart3, color: "text-blue-600 dark:text-cyan-400" },
+    { title: "Lost Time Injury Frequency", value: "0.0", status: "Perfect Safety Record", icon: ShieldCheck, color: "text-emerald-600 dark:text-emerald-400" },
+    { title: "Avg Material Approval Time", value: "3.4 hrs", status: "High Agility", icon: Zap, color: "text-purple-600 dark:text-purple-400" },
   ];
 
   return (
@@ -66,22 +67,27 @@ export default function ReportsAnalyticsPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {kpis.map((kpi, idx) => (
-              <div
-                key={idx}
-                className={`p-6 rounded-2xl border ${
-                  isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80 shadow-xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl">{kpi.icon}</span>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">KPI</span>
+            {kpis.map((kpi, idx) => {
+              const IconComp = kpi.icon;
+              return (
+                <div
+                  key={idx}
+                  className={`p-6 rounded-2xl border ${
+                    isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80 shadow-xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80">
+                      <IconComp className="w-5 h-5 text-blue-600 dark:text-cyan-400" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">KPI</span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-3">{kpi.title}</p>
+                  <p className={`text-3xl font-black mt-1 ${kpi.color}`}>{kpi.value}</p>
+                  <p className="text-[11px] font-semibold text-slate-400 mt-1">{kpi.status}</p>
                 </div>
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-3">{kpi.title}</p>
-                <p className={`text-3xl font-black mt-1 ${kpi.color}`}>{kpi.value}</p>
-                <p className="text-[11px] font-semibold text-slate-400 mt-1">{kpi.status}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Project Health Scorecard */}
@@ -91,7 +97,8 @@ export default function ReportsAnalyticsPage() {
             }`}
           >
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <span>🩺</span> Portfolio Health Assessment
+              <Activity className="w-5 h-5 text-blue-500" />
+              <span>Portfolio Health Assessment</span>
             </h2>
 
             <div className="space-y-3">

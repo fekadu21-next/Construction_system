@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Sun, Moon, CheckCircle2 } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { useLanguage } from "../../contexts/LanguageContext.jsx";
 
@@ -25,7 +26,8 @@ export default function SettingsPage() {
 
       {success && (
         <div className="p-4 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2">
-          <span>✓</span> {success}
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>{success}</span>
         </div>
       )}
 
@@ -41,21 +43,23 @@ export default function SettingsPage() {
               onClick={() => {
                 if (isDark) toggleTheme();
               }}
-              className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                !isDark ? "bg-blue-600 text-white border-blue-600" : "bg-slate-100 dark:bg-slate-800 text-slate-600"
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                !isDark ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-sm" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
               }`}
             >
-              ☀️ Light Theme
+              <Sun className="w-4 h-4" />
+              <span>Light Theme</span>
             </button>
             <button
               onClick={() => {
                 if (!isDark) toggleTheme();
               }}
-              className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                isDark ? "bg-blue-600 text-white border-blue-600" : "bg-slate-100 dark:bg-slate-800 text-slate-600"
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                isDark ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-sm" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
               }`}
             >
-              🌙 Dark Theme
+              <Moon className="w-4 h-4" />
+              <span>Dark Theme</span>
             </button>
           </div>
         </div>
@@ -65,7 +69,7 @@ export default function SettingsPage() {
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="w-full sm:w-64 px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+            className="w-full sm:w-64 px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
           >
             <option value="en">English (US)</option>
             <option value="am">አማርኛ (Amharic)</option>
@@ -75,7 +79,7 @@ export default function SettingsPage() {
         <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
           <button
             onClick={handleSave}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
           >
             Save Preferences
           </button>

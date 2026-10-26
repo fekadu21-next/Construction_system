@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Search, Building2, MapPin, Eye, X, CheckCircle2, Clock, Calendar, ArrowRight } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { projectManagerService } from "../../services/projectManagerService.js";
 
@@ -91,7 +92,7 @@ export default function MyProjectsPage() {
                 onClick={() => setStatusFilter(tab)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
                   statusFilter === tab
-                    ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-600/30"
                     : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}
               >
@@ -102,7 +103,7 @@ export default function MyProjectsPage() {
 
           {/* Search Box */}
           <div className="relative w-full sm:w-72">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
             <input
               type="text"
               placeholder="Filter by project or site engineer..."
@@ -126,7 +127,7 @@ export default function MyProjectsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center rounded-2xl border bg-white dark:bg-[#0d1c33] border-slate-200 dark:border-slate-800 text-slate-500">
-          <span className="text-4xl">🏗️</span>
+          <Building2 className="w-10 h-10 text-slate-400 mx-auto mb-2" />
           <p className="text-base font-bold text-slate-800 dark:text-slate-200 mt-2">No projects found</p>
           <p className="text-xs text-slate-400 mt-1">Adjust filters or search keywords</p>
         </div>
@@ -162,8 +163,9 @@ export default function MyProjectsPage() {
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                    <span>📍</span> {p.location}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{p.location}</span>
                   </p>
 
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 space-y-1.5">
@@ -209,7 +211,7 @@ export default function MyProjectsPage() {
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                   <button
                     onClick={() => setSelectedProject(p)}
-                    className="w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-xs transition-all"
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
                   >
                     View Full Details
                   </button>
@@ -231,21 +233,23 @@ export default function MyProjectsPage() {
             <div className="flex items-start justify-between border-b pb-4 border-slate-200 dark:border-slate-800">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">🏗️</span>
+                  <Building2 className="w-5 h-5 text-blue-500" />
                   <h3 className="text-lg font-bold">{selectedProject.projectName}</h3>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="font-mono text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-cyan-300 font-bold">
                     {selectedProject.projectCode}
                   </span>
-                  <span className="text-xs text-slate-500">📍 {selectedProject.location}</span>
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-blue-500" /> {selectedProject.location}
+                  </span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedProject(null)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -280,7 +284,7 @@ export default function MyProjectsPage() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setSelectedProject(null)}
-                className="px-5 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 font-bold text-xs"
+                className="px-5 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 font-bold text-xs"
               >
                 Close
               </button>

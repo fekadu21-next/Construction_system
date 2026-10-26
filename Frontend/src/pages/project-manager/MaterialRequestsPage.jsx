@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Search, Package, Check, X, CheckCircle2, AlertTriangle, Building2, Wrench, Calendar, MapPin, DollarSign, User } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { projectManagerService } from "../../services/projectManagerService.js";
 
@@ -131,7 +132,7 @@ export default function MaterialRequestsPage() {
                 onClick={() => setStatusFilter(tab)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
                   statusFilter === tab
-                    ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-600/30"
                     : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}
               >
@@ -141,7 +142,7 @@ export default function MaterialRequestsPage() {
           </div>
 
           <div className="relative w-full sm:w-72">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
             <input
               type="text"
               placeholder="Search request #, project, materials..."
@@ -165,7 +166,7 @@ export default function MaterialRequestsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center rounded-2xl border bg-white dark:bg-[#0d1c33] border-slate-200 dark:border-slate-800 text-slate-500">
-          <span className="text-4xl">📦</span>
+          <Package className="w-10 h-10 text-slate-400 mx-auto mb-2" />
           <p className="text-base font-bold text-slate-800 dark:text-slate-200 mt-2">No material requests found</p>
           <p className="text-xs text-slate-400 mt-1">Try switching tabs or adjusting search criteria</p>
         </div>
@@ -213,8 +214,9 @@ export default function MaterialRequestsPage() {
                       </span>
                     </div>
 
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                      🛠️ {r.requestedMaterials}
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Wrench className="w-4 h-4 text-blue-500 shrink-0" />
+                      <span>{r.requestedMaterials}</span>
                     </p>
 
                     <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
@@ -239,21 +241,24 @@ export default function MaterialRequestsPage() {
                     <div className="flex items-center gap-2.5 shrink-0">
                       <button
                         onClick={() => setActionRequest({ request: r, type: "REJECT" })}
-                        className="px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 text-xs font-bold transition-all"
+                        className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 text-xs font-bold transition-all"
                       >
-                        ✕ Reject
+                        <X className="w-3.5 h-3.5" />
+                        <span>Reject</span>
                       </button>
                       <button
                         onClick={() => setActionRequest({ request: r, type: "APPROVE" })}
-                        className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/30 transition-all transform active:scale-95"
+                        className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold uppercase tracking-wider shadow-sm shadow-emerald-600/30 transition-all transform active:scale-95"
                       >
-                        ✓ Approve Request
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Approve Request</span>
                       </button>
                     </div>
                   ) : (
                     <div className="shrink-0 text-right">
-                      <span className="text-xs font-bold text-slate-400">
-                        {r.status === "APPROVED" ? "✓ Authorized by PM" : "✕ Declined by PM"}
+                      <span className="text-xs font-bold text-slate-400 flex items-center gap-1 justify-end">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>{r.status === "APPROVED" ? "Authorized by PM" : "Declined by PM"}</span>
                       </span>
                     </div>
                   )}
@@ -275,7 +280,11 @@ export default function MaterialRequestsPage() {
             <div className="flex items-start justify-between border-b pb-3 border-slate-200 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold flex items-center gap-2">
-                  <span>{actionRequest.type === "APPROVE" ? "✅" : "🛑"}</span>
+                  {actionRequest.type === "APPROVE" ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-rose-500" />
+                  )}
                   <span>
                     {actionRequest.type === "APPROVE" ? "Approve Material Requisition" : "Reject Material Requisition"}
                   </span>
@@ -286,9 +295,9 @@ export default function MaterialRequestsPage() {
               </div>
               <button
                 onClick={() => setActionRequest(null)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 

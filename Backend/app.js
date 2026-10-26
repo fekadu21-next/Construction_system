@@ -8,6 +8,7 @@ import userRoutes from "./routes/userRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import preferencesRoutes from "./routes/preferencesRoutes.js";
+import projectManagerRoutes from "./routes/project-manager/projectManagerRoutes.js";
 
 const app = express();
 
@@ -79,6 +80,10 @@ app.use("/api/projects", projectRoutes);
 
 // Dashboard routes (General Manager only)
 app.use("/api/general-manager", dashboardRoutes);
+
+// Project Manager routes (supporting standard and v1 endpoints)
+app.use("/api/project-manager", projectManagerRoutes);
+app.use("/api/v1/project-manager", projectManagerRoutes);
 
 // User preferences routes
 app.use("/api/preferences", preferencesRoutes);

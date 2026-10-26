@@ -9,6 +9,7 @@ import projectRoutes from "./routes/projectRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import preferencesRoutes from "./routes/preferencesRoutes.js";
 import projectManagerRoutes from "./routes/project-manager/projectManagerRoutes.js";
+import siteEngineerRoutes from "./routes/site-engineer/siteEngineerRoutes.js";
 
 const app = express();
 
@@ -84,6 +85,10 @@ app.use("/api/general-manager", dashboardRoutes);
 // Project Manager routes (supporting standard and v1 endpoints)
 app.use("/api/project-manager", projectManagerRoutes);
 app.use("/api/v1/project-manager", projectManagerRoutes);
+
+// Site Engineer routes (supporting standard and v1 endpoints)
+app.use("/api/site-engineer", siteEngineerRoutes);
+app.use("/api/v1/site-engineer", siteEngineerRoutes);
 
 // User preferences routes
 app.use("/api/preferences", preferencesRoutes);

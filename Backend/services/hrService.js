@@ -5,6 +5,7 @@ import {
   ATTENDANCE_STATUS,
   ATTENDANCE_APPROVAL_STATUS,
   ATTENDANCE_VALUE_RULES,
+  WORKER_TRADE,
 } from "../constants/hrConstants.js";
 
 function calculateWorkHours(checkIn, checkOut, status) {
@@ -36,18 +37,252 @@ function calculateWorkHours(checkIn, checkOut, status) {
 
 export const hrService = {
   async generateNextEmployeeCode() {
-    const latest = await hrRepository.findLatestEmployee();
-    if (!latest || !latest.employeeCode) {
-      return "EMP-0001";
+    const employees = await prisma.employee.findMany({
+      select: { employeeCode: true },
+    });
+    let maxNum = 0;
+    employees.forEach((emp) => {
+      const match = emp.employeeCode?.match(/^EMP-(\d+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxNum) maxNum = n;
+      }
+    });
+    return `EMP-${String(maxNum + 1).padStart(4, "0")}`;
+  },
+
+  /**
+   * Fetch all system users for import preview into the HR workforce roster
+   */
+  async getSystemUsersForImport() {
+    const [users, employees] = await Promise.all([
+      prisma.user.findMany({
+        include: { role: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.employee.findMany({
+        select: { id: true, email: true, employeeCode: true, trade: true, status: true },
+      }),
+    ]);
+
+    const empByEmail = new Map();
+    employees.forEach((emp) => {
+      if (emp.email) {
+        empByEmail.set(emp.email.toLowerCase().trim(), emp);
+      }
+    });
+
+    return users.map((u) => {
+      const matched = u.email ? empByEmail.get(u.email.toLowerCase().trim()) : null;
+      return {
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        phone: u.phone,
+        role: u.role?.name || "UNKNOWN",
+        roleDescription: u.role?.description || "",
+        isActive: u.isActive,
+        isImported: Boolean(matched),
+        employeeCode: matched?.employeeCode || null,
+        employeeId: matched?.id || null,
+      };
+    });
+  },
+
+  /**
+   * Import system users into workforce employees table
+   */
+  async importUsersToEmployees(actorId, userIds = null) {
+    const where = {};
+    if (Array.isArray(userIds) && userIds.length > 0) {
+      where.id = { in: userIds };
+    }
+    const users = await prisma.user.findMany({
+      where,
+      include: { role: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!users || users.length === 0) {
+      return {
+        importedCount: 0,
+        skippedCount: 0,
+        totalUsers: 0,
+        imported: [],
+        skipped: [],
+      };
     }
 
-    const match = latest.employeeCode.match(/EMP-(\d+)/);
-    if (match) {
-      const nextNum = parseInt(match[1], 10) + 1;
-      return `EMP-${String(nextNum).padStart(4, "0")}`;
+    const existingEmployees = await prisma.employee.findMany({
+      select: { id: true, email: true, employeeCode: true, fullName: true },
+    });
+
+    const existingEmails = new Set(
+      existingEmployees
+        .filter((e) => e.email)
+        .map((e) => e.email.toLowerCase().trim())
+    );
+
+    let maxNum = 0;
+    existingEmployees.forEach((emp) => {
+      const match = emp.employeeCode?.match(/^EMP-(\d+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxNum) maxNum = n;
+      }
+    });
+
+    const imported = [];
+    const skipped = [];
+
+    for (const user of users) {
+      const normalizedEmail = user.email?.toLowerCase().trim();
+      if (normalizedEmail && existingEmails.has(normalizedEmail)) {
+        const existing = existingEmployees.find(
+          (e) => e.email?.toLowerCase().trim() === normalizedEmail
+        );
+        skipped.push({
+          userId: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          employeeCode: existing?.employeeCode,
+          reason: "Already registered in workforce roster",
+        });
+        continue;
+      }
+
+      maxNum += 1;
+      const employeeCode = `EMP-${String(maxNum).padStart(4, "0")}`;
+
+      const userRole = user.role?.name || "SITE_LABORER";
+      const trade = WORKER_TRADE[userRole] ? userRole : "SITE_LABORER";
+
+      const newEmp = await prisma.employee.create({
+        data: {
+          employeeCode,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone?.trim() || "+251900000000",
+          trade,
+          employmentType: "FULL_TIME",
+          status: user.isActive ? "ACTIVE" : "INACTIVE",
+          hireDate: user.createdAt ? new Date(user.createdAt) : new Date(),
+          workTeam: "Executive & Staff",
+          currency: "ETB",
+        },
+      });
+
+      if (normalizedEmail) {
+        existingEmails.add(normalizedEmail);
+      }
+
+      imported.push({
+        id: newEmp.id,
+        userId: user.id,
+        employeeCode: newEmp.employeeCode,
+        fullName: newEmp.fullName,
+        email: newEmp.email,
+        trade: newEmp.trade,
+      });
     }
 
-    return `EMP-${Date.now().toString().slice(-4)}`;
+    if (imported.length > 0) {
+      try {
+        let validActorId = null;
+        if (actorId) {
+          const actor = await prisma.user.findUnique({
+            where: { id: actorId },
+            select: { id: true },
+          });
+          if (actor) validActorId = actor.id;
+        }
+
+        await prisma.auditLog.create({
+          data: {
+            actorUserId: validActorId,
+            action: "IMPORT_USERS_TO_EMPLOYEES",
+            entityType: "Employee",
+            details: {
+              importedCount: imported.length,
+              skippedCount: skipped.length,
+              importedCodes: imported.map((i) => i.employeeCode),
+            },
+          },
+        });
+      } catch (auditErr) {
+        console.warn("Audit log creation warning:", auditErr.message);
+      }
+    }
+
+    return {
+      importedCount: imported.length,
+      skippedCount: skipped.length,
+      totalUsers: users.length,
+      imported,
+      skipped,
+    };
+  },
+
+  /**
+   * Automatically merge and sync system users into the workforce employee roster
+   */
+  async autoSyncUsersToEmployees() {
+    try {
+      const [users, existingEmployees] = await Promise.all([
+        prisma.user.findMany({
+          include: { role: true },
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.employee.findMany({
+          select: { id: true, email: true, employeeCode: true, trade: true, status: true },
+        }),
+      ]);
+
+      const existingMap = new Map();
+      let maxNum = 0;
+      existingEmployees.forEach((emp) => {
+        if (emp.email) {
+          existingMap.set(emp.email.toLowerCase().trim(), emp);
+        }
+        const match = emp.employeeCode?.match(/^EMP-(\d+)$/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      });
+
+      for (const user of users) {
+        if (!user.email) continue;
+        const normalizedEmail = user.email.toLowerCase().trim();
+        const existing = existingMap.get(normalizedEmail);
+
+        const userRole = user.role?.name || "SITE_LABORER";
+        const trade = WORKER_TRADE[userRole] ? userRole : "SITE_LABORER";
+        const status = user.isActive ? "ACTIVE" : "INACTIVE";
+
+        if (!existing) {
+          maxNum += 1;
+          const employeeCode = `EMP-${String(maxNum).padStart(4, "0")}`;
+
+          await prisma.employee.create({
+            data: {
+              employeeCode,
+              fullName: user.fullName,
+              email: user.email,
+              phone: user.phone?.trim() || "+251900000000",
+              trade,
+              employmentType: "FULL_TIME",
+              status,
+              hireDate: user.createdAt ? new Date(user.createdAt) : new Date(),
+              workTeam: "Executive & Staff",
+              currency: "ETB",
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Auto-sync users into employee workforce warning:", err.message);
+    }
   },
 
   async getEmployees({
@@ -61,6 +296,9 @@ export const hrService = {
     sortBy = "createdAt",
     sortOrder = "desc",
   }) {
+    // Automatically merge users to employees so workforce always displays all company users
+    await this.autoSyncUsersToEmployees();
+
     const pageNum = Math.max(1, parseInt(page) || 1);
     const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 10));
     const skip = (pageNum - 1) * limitNum;
@@ -152,6 +390,7 @@ export const hrService = {
       fullName: data.fullName.trim(),
       phone: data.phone.trim(),
       email: data.email ? data.email.trim().toLowerCase() : null,
+      address: data.address ? data.address.trim() : null,
       trade: data.trade,
       employmentType: data.employmentType || "DAILY_LABORER",
       dailyRate: data.dailyRate ? Number(data.dailyRate) : null,
@@ -159,8 +398,32 @@ export const hrService = {
       currency: data.currency || "ETB",
       status: data.status || "ACTIVE",
       nationalId: data.nationalId ? data.nationalId.trim() : null,
+      emergencyContactName: data.emergencyContactName ? data.emergencyContactName.trim() : null,
+      emergencyContactPhone: data.emergencyContactPhone ? data.emergencyContactPhone.trim() : null,
+      hireDate: data.hireDate ? new Date(data.hireDate) : new Date(),
+      workTeam: data.workTeam ? data.workTeam.trim() : null,
       assignedProjectId: data.assignedProjectId || null,
     });
+
+    // If an initial project was assigned at registration, record a project assignment entry
+    if (data.assignedProjectId) {
+      try {
+        await prisma.projectAssignment.create({
+          data: {
+            employeeId: employee.id,
+            projectId: data.assignedProjectId,
+            jobRole: data.trade,
+            workTeam: data.workTeam || "Main Team",
+            startDate: data.hireDate ? new Date(data.hireDate) : new Date(),
+            status: "ACTIVE",
+            notes: "Initial project assignment on registration",
+            assignedById: actorId,
+          },
+        });
+      } catch (e) {
+        console.warn("Initial assignment creation warning:", e.message);
+      }
+    }
 
     try {
       await prisma.auditLog.create({
@@ -187,7 +450,7 @@ export const hrService = {
         message: `${employee.fullName} (${employee.trade}) registered with ID ${employee.employeeCode}`,
         type: "SUCCESS",
         category: "WORKFORCE",
-        link: "/hr/workers",
+        link: "/hr/employees",
       });
     } catch (notifErr) {
       console.warn("Notification dispatch failed:", notifErr.message);
@@ -212,32 +475,272 @@ export const hrService = {
     }
 
     const updateData = {};
-    if (data.fullName !== undefined) updateData.fullName = data.fullName.trim();
-    if (data.phone !== undefined) updateData.phone = data.phone.trim();
-    if (data.email !== undefined) updateData.email = data.email ? data.email.trim().toLowerCase() : null;
+    if (data.fullName !== undefined) updateData.fullName = String(data.fullName).trim();
+
+    if (data.employeeCode !== undefined && data.employeeCode.trim() && data.employeeCode.trim() !== existing.employeeCode) {
+      const codeTrimmed = data.employeeCode.trim();
+      const codeCheck = await prisma.employee.findFirst({
+        where: {
+          employeeCode: codeTrimmed,
+          id: { not: id },
+        },
+      });
+      if (codeCheck) {
+        throw new Error(`Employee code "${codeTrimmed}" is already registered to another employee (${codeCheck.fullName})`);
+      }
+      updateData.employeeCode = codeTrimmed;
+    }
+
+    if (data.phone !== undefined) updateData.phone = String(data.phone).trim();
+    if (data.email !== undefined) updateData.email = data.email && String(data.email).trim() ? String(data.email).trim().toLowerCase() : null;
+    if (data.address !== undefined) updateData.address = data.address && String(data.address).trim() ? String(data.address).trim() : null;
     if (data.trade !== undefined) updateData.trade = data.trade;
     if (data.employmentType !== undefined) updateData.employmentType = data.employmentType;
-    if (data.dailyRate !== undefined) updateData.dailyRate = data.dailyRate ? Number(data.dailyRate) : null;
-    if (data.monthlySalary !== undefined) updateData.monthlySalary = data.monthlySalary ? Number(data.monthlySalary) : null;
-    if (data.currency !== undefined) updateData.currency = data.currency;
+
+    if (data.dailyRate !== undefined) {
+      if (data.dailyRate === "" || data.dailyRate === null) {
+        updateData.dailyRate = null;
+      } else {
+        const num = Number(data.dailyRate);
+        updateData.dailyRate = isNaN(num) ? null : num;
+      }
+    }
+
+    if (data.monthlySalary !== undefined) {
+      if (data.monthlySalary === "" || data.monthlySalary === null) {
+        updateData.monthlySalary = null;
+      } else {
+        const num = Number(data.monthlySalary);
+        updateData.monthlySalary = isNaN(num) ? null : num;
+      }
+    }
+
+    if (data.currency !== undefined) updateData.currency = data.currency || "ETB";
     if (data.status !== undefined) updateData.status = data.status;
-    if (data.nationalId !== undefined) updateData.nationalId = data.nationalId ? data.nationalId.trim() : null;
+    if (data.nationalId !== undefined) updateData.nationalId = data.nationalId && String(data.nationalId).trim() ? String(data.nationalId).trim() : null;
+    if (data.emergencyContactName !== undefined) updateData.emergencyContactName = data.emergencyContactName && String(data.emergencyContactName).trim() ? String(data.emergencyContactName).trim() : null;
+    if (data.emergencyContactPhone !== undefined) updateData.emergencyContactPhone = data.emergencyContactPhone && String(data.emergencyContactPhone).trim() ? String(data.emergencyContactPhone).trim() : null;
+
+    if (data.hireDate !== undefined) {
+      if (!data.hireDate || data.hireDate === "") {
+        updateData.hireDate = null;
+      } else {
+        const parsed = new Date(data.hireDate);
+        updateData.hireDate = isNaN(parsed.getTime()) ? null : parsed;
+      }
+    }
+
+    if (data.workTeam !== undefined) updateData.workTeam = data.workTeam && String(data.workTeam).trim() ? String(data.workTeam).trim() : null;
     if (data.assignedProjectId !== undefined) updateData.assignedProjectId = data.assignedProjectId || null;
 
     const updated = await hrRepository.updateEmployee(id, updateData);
 
+    // If project assignment changed, keep project_assignments table in sync
+    if (data.assignedProjectId !== undefined && data.assignedProjectId !== existing.assignedProjectId) {
+      try {
+        if (data.assignedProjectId) {
+          await prisma.projectAssignment.updateMany({
+            where: { employeeId: id, status: "ACTIVE" },
+            data: { status: "TRANSFERRED", endDate: new Date() },
+          });
+
+          await prisma.projectAssignment.create({
+            data: {
+              employeeId: id,
+              projectId: data.assignedProjectId,
+              jobRole: data.trade || existing.trade,
+              workTeam: data.workTeam || existing.workTeam || "Main Team",
+              startDate: new Date(),
+              status: "ACTIVE",
+              notes: "Updated via worker profile editor",
+              assignedById: actorId || null,
+            },
+          });
+        } else {
+          await prisma.projectAssignment.updateMany({
+            where: { employeeId: id, status: "ACTIVE" },
+            data: { status: "COMPLETED", endDate: new Date(), notes: "Unassigned to bench via worker editor" },
+          });
+        }
+      } catch (assignSyncErr) {
+        console.warn("Assignment sync warning on employee edit:", assignSyncErr.message);
+      }
+    }
+
     try {
-      await prisma.auditLog.create({
-        data: {
-          actorUserId: actorId,
-          action: "UPDATE_EMPLOYEE",
-          entityType: "Employee",
-          entityId: updated.id,
-          details: { updatedFields: Object.keys(updateData) },
-        },
-      });
+      if (actorId) {
+        const actor = await prisma.user.findUnique({ where: { id: actorId } });
+        if (actor) {
+          await prisma.auditLog.create({
+            data: {
+              actorUserId: actorId,
+              action: "UPDATE_EMPLOYEE",
+              entityType: "Employee",
+              entityId: updated.id,
+              details: { updatedFields: Object.keys(updateData) },
+            },
+          });
+        }
+      }
     } catch (auditErr) {
       console.warn("Audit log creation failed:", auditErr.message);
+    }
+
+    return updated;
+  },
+
+  /**
+   * HR Approval for Daily Worker registered by Site Supervisor
+   */
+  async approveDailyWorker(id, actorId) {
+    // Ensure the worker exists
+    const existing = await hrRepository.findEmployeeById(id);
+    if (!existing) {
+      throw new Error("Employee not found");
+    }
+
+    const currentStatus = (existing.status || "").toUpperCase();
+
+    // If already active, return gracefully
+    if (currentStatus === "ACTIVE") {
+      return existing;
+    }
+
+    if (!["PENDING_APPROVAL", "PENDING", "DRAFT"].includes(currentStatus)) {
+      throw new Error(`Cannot approve worker with status "${existing.status}". Only workers pending HR approval can be approved.`);
+    }
+
+    // Set employee status to ACTIVE
+    const updated = await hrRepository.updateEmployee(id, { status: "ACTIVE" });
+
+    // Activate or create project assignment for this employee
+    try {
+      const assignmentCount = await prisma.projectAssignment.count({
+        where: { employeeId: id },
+      });
+
+      if (assignmentCount === 0 && existing.assignedProjectId) {
+        await prisma.projectAssignment.create({
+          data: {
+            employeeId: id,
+            projectId: existing.assignedProjectId,
+            jobRole: existing.trade || "SITE_LABORER",
+            workTeam: existing.workTeam || "Site Daily Crew",
+            startDate: new Date(),
+            status: "ACTIVE",
+            notes: "Approved by HR Manager",
+            assignedById: actorId || null,
+          },
+        });
+      } else {
+        await prisma.projectAssignment.updateMany({
+          where: {
+            employeeId: id,
+            status: { in: ["PENDING", "PENDING_APPROVAL"] },
+          },
+          data: { status: "ACTIVE" },
+        });
+      }
+    } catch (e) {
+      console.warn("Assignment update warning:", e.message);
+    }
+
+    // Audit Log
+    try {
+      if (actorId) {
+        await prisma.auditLog.create({
+          data: {
+            actorUserId: actorId,
+            action: "APPROVE_DAILY_WORKER",
+            entityType: "Employee",
+            entityId: id,
+            details: {
+              employeeCode: updated.employeeCode,
+              fullName: updated.fullName,
+              trade: updated.trade,
+              status: "ACTIVE",
+            },
+          },
+        });
+      }
+    } catch (auditErr) {
+      console.warn("Audit log creation failed:", auditErr.message);
+    }
+
+    // Notify Site Supervisor
+    try {
+      await notificationService.createNotification({
+        recipientRole: "SUPERVISOR",
+        title: "Daily Worker Approved by HR",
+        message: `HR Manager approved daily laborer ${updated.fullName} (${updated.employeeCode}). Worker is now officially active on site.`,
+        type: "SUCCESS",
+        category: "WORKFORCE",
+        link: "/supervisor/attendance",
+      });
+    } catch (notifErr) {
+      console.warn("Notification dispatch failed:", notifErr.message);
+    }
+
+    return updated;
+  },
+
+  /**
+   * HR Rejection for Daily Worker registered by Site Supervisor
+   */
+  async rejectDailyWorker(id, reason, actorId) {
+    const existing = await hrRepository.findEmployeeById(id);
+    if (!existing) {
+      throw new Error("Employee not found");
+    }
+
+    const updated = await hrRepository.updateEmployee(id, {
+      status: "REJECTED",
+    });
+
+    // Cancel pending project assignment
+    try {
+      await prisma.projectAssignment.updateMany({
+        where: { employeeId: id },
+        data: { status: "CANCELLED" },
+      });
+    } catch (e) {
+      console.warn("Assignment update warning:", e.message);
+    }
+
+    // Audit Log
+    try {
+      if (actorId) {
+        await prisma.auditLog.create({
+          data: {
+            actorUserId: actorId,
+            action: "REJECT_DAILY_WORKER",
+            entityType: "Employee",
+            entityId: id,
+            details: {
+              employeeCode: updated.employeeCode,
+              fullName: updated.fullName,
+              reason: reason || "Rejected by HR",
+              status: "REJECTED",
+            },
+          },
+        });
+      }
+    } catch (auditErr) {
+      console.warn("Audit log creation failed:", auditErr.message);
+    }
+
+    // Notify Site Supervisor
+    try {
+      await notificationService.createNotification({
+        recipientRole: "SUPERVISOR",
+        title: "Daily Worker Registration Rejected",
+        message: `HR Manager rejected daily laborer ${updated.fullName} (${updated.employeeCode}). Reason: ${reason || "Verification rejected"}.`,
+        type: "ERROR",
+        category: "WORKFORCE",
+        link: "/supervisor/attendance",
+      });
+    } catch (notifErr) {
+      console.warn("Notification dispatch failed:", notifErr.message);
     }
 
     return updated;
@@ -562,6 +1065,34 @@ export const hrService = {
       reviewedById: actorId,
       reviewerNote,
     });
+
+    // When HR approves the daily site attendance sheet, automatically activate any daily workers registered on that site
+    if (status === "APPROVED") {
+      try {
+        const workerWhere = { status: "PENDING_APPROVAL" };
+        if (projectId && projectId !== "all") {
+          workerWhere.assignedProjectId = projectId;
+        }
+        const pendingWorkers = await prisma.employee.findMany({
+          where: workerWhere,
+          select: { id: true },
+        });
+
+        if (pendingWorkers.length > 0) {
+          const workerIds = pendingWorkers.map((w) => w.id);
+          await prisma.employee.updateMany({
+            where: { id: { in: workerIds } },
+            data: { status: "ACTIVE" },
+          });
+          await prisma.projectAssignment.updateMany({
+            where: { employeeId: { in: workerIds }, status: "PENDING" },
+            data: { status: "ACTIVE" },
+          });
+        }
+      } catch (pwErr) {
+        console.warn("Auto-approving pending workers warning:", pwErr.message);
+      }
+    }
 
     try {
       await prisma.auditLog.create({
@@ -1219,5 +1750,187 @@ export const hrService = {
 
   async getProjects() {
     return hrRepository.findProjects();
+  },
+
+  async getAvailableWorkers() {
+    const workers = await prisma.employee.findMany({
+      where: {
+        OR: [
+          { assignedProjectId: null },
+          { status: "ACTIVE", assignedProjectId: null },
+        ],
+      },
+      orderBy: { fullName: "asc" },
+    });
+    return workers;
+  },
+
+  async assignWorkerToProject({ employeeId, workerId, projectId, jobRole, roleOnProject, workTeam, startDate, endDate, notes }, actorId) {
+    const targetEmployeeId = employeeId || workerId;
+    const targetJobRole = jobRole || roleOnProject;
+
+    if (!targetEmployeeId || !projectId) {
+      throw new Error("Worker ID and Project ID are required");
+    }
+
+    const [employee, project] = await Promise.all([
+      prisma.employee.findUnique({ where: { id: targetEmployeeId } }),
+      prisma.project.findUnique({ where: { id: projectId } }),
+    ]);
+
+    if (!employee) throw new Error("Worker not found");
+    if (!project) throw new Error("Project not found");
+    if (project.archivedAt) throw new Error("Cannot assign worker to an archived project");
+
+    // Check existing active assignment
+    const existingActive = await prisma.projectAssignment.findFirst({
+      where: { employeeId: targetEmployeeId, status: "ACTIVE" },
+      include: { project: true },
+    });
+
+    if (existingActive) {
+      if (existingActive.projectId === projectId) {
+        throw new Error(`Worker is already actively assigned to "${project.projectName}"`);
+      }
+      // Overlapping prevention
+      throw new Error(`Worker is currently actively assigned to "${existingActive.project.projectName}". Please use the Transfer workflow with an effective transfer date.`);
+    }
+
+    const assignment = await prisma.projectAssignment.create({
+      data: {
+        employeeId: targetEmployeeId,
+        projectId,
+        jobRole: targetJobRole || employee.trade,
+        workTeam: workTeam || employee.workTeam || "Main Team",
+        startDate: startDate ? new Date(startDate) : new Date(),
+        endDate: endDate ? new Date(endDate) : null,
+        status: "ACTIVE",
+        notes: notes || null,
+        assignedById: actorId,
+      },
+      include: { project: true, employee: true },
+    });
+
+    // Sync employee table
+    await prisma.employee.update({
+      where: { id: targetEmployeeId },
+      data: {
+        assignedProjectId: projectId,
+        workTeam: workTeam || employee.workTeam,
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: actorId,
+          action: "ASSIGN_WORKER_PROJECT",
+          entityType: "ProjectAssignment",
+          entityId: assignment.id,
+          details: { employeeId: targetEmployeeId, projectId, jobRole: assignment.jobRole },
+        },
+      });
+
+      await notificationService.createNotification({
+        title: "Worker Assigned to Project",
+        message: `${employee.fullName} (${employee.trade}) assigned to "${project.projectName}"`,
+        type: "INFO",
+        category: "WORKFORCE",
+        link: "/hr/employees",
+      });
+    } catch (e) {
+      console.warn("Assignment notification warning:", e.message);
+    }
+
+    return assignment;
+  },
+
+  async transferWorker({ employeeId, workerId, toProjectId, projectId, effectiveDate, jobRole, roleOnProject, newRole, workTeam, reason, notes }, actorId) {
+    const targetEmployeeId = employeeId || workerId;
+    const destinationProjectId = toProjectId || projectId;
+    const targetJobRole = newRole || jobRole || roleOnProject;
+    const targetReason = reason || notes;
+
+    if (!targetEmployeeId || !destinationProjectId) {
+      throw new Error("Worker ID and Target Project ID are required");
+    }
+
+    const [employee, toProject] = await Promise.all([
+      prisma.employee.findUnique({ where: { id: targetEmployeeId } }),
+      prisma.project.findUnique({ where: { id: destinationProjectId } }),
+    ]);
+
+    if (!employee) throw new Error("Worker not found");
+    if (!toProject) throw new Error("Target project not found");
+
+    const transferDate = effectiveDate ? new Date(effectiveDate) : new Date();
+
+    // Close any currently active assignment
+    await prisma.projectAssignment.updateMany({
+      where: { employeeId: targetEmployeeId, status: "ACTIVE" },
+      data: {
+        status: "TRANSFERRED",
+        endDate: transferDate,
+      },
+    });
+
+    // Create new assignment
+    const newAssignment = await prisma.projectAssignment.create({
+      data: {
+        employeeId: targetEmployeeId,
+        projectId: destinationProjectId,
+        jobRole: targetJobRole || employee.trade,
+        workTeam: workTeam || employee.workTeam || "Main Team",
+        startDate: transferDate,
+        status: "ACTIVE",
+        notes: targetReason ? `Transfer reason: ${targetReason}` : "Project transfer",
+        assignedById: actorId,
+      },
+      include: { project: true, employee: true },
+    });
+
+    // Update employee current project
+    await prisma.employee.update({
+      where: { id: targetEmployeeId },
+      data: {
+        assignedProjectId: destinationProjectId,
+        workTeam: workTeam || employee.workTeam,
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: actorId,
+          action: "TRANSFER_WORKER_PROJECT",
+          entityType: "ProjectAssignment",
+          entityId: newAssignment.id,
+          details: { employeeId: targetEmployeeId, toProjectId: destinationProjectId, reason: targetReason },
+        },
+      });
+
+      await notificationService.createNotification({
+        title: "Worker Transferred to Site",
+        message: `${employee.fullName} transferred to project "${toProject.projectName}"`,
+        type: "INFO",
+        category: "WORKFORCE",
+        link: "/hr/employees",
+      });
+    } catch (e) {
+      console.warn("Transfer notification warning:", e.message);
+    }
+
+    return newAssignment;
+  },
+
+  async getWorkerAssignments(employeeId) {
+    const assignments = await prisma.projectAssignment.findMany({
+      where: { employeeId },
+      include: {
+        project: { select: { projectName: true, projectCode: true, location: true, status: true } },
+      },
+      orderBy: { startDate: "desc" },
+    });
+    return assignments;
   },
 };

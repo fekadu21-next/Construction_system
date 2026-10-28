@@ -1,5 +1,11 @@
 export const WORKER_TRADES = [
+  { value: "GENERAL_MANAGER", label: "General Manager" },
+  { value: "PROJECT_MANAGER", label: "Project Manager" },
+  { value: "HR_MANAGER", label: "HR Manager" },
   { value: "SITE_ENGINEER", label: "Site Engineer" },
+  { value: "ACCOUNTANT", label: "Accountant" },
+  { value: "PROCUREMENT_OFFICER", label: "Procurement Officer" },
+  { value: "SUPERVISOR", label: "Supervisor" },
   { value: "FOREMAN", label: "Foreman" },
   { value: "SURVEYOR", label: "Surveyor" },
   { value: "SAFETY_OFFICER", label: "Safety Officer" },
@@ -10,8 +16,14 @@ export const WORKER_TRADES = [
   { value: "WELDER", label: "Welder" },
   { value: "HEAVY_EQUIPMENT_OPERATOR", label: "Heavy Equipment Operator" },
   { value: "SITE_LABORER", label: "Site Laborer" },
+  { value: "STEEL_FIXER", label: "Steel Fixer" },
   { value: "PAINTER", label: "Painter" },
   { value: "SCAFFOLDER", label: "Scaffolder" },
+  { value: "PLASTERER", label: "Plasterer" },
+  { value: "TILER", label: "Tiler" },
+  { value: "GLAZIER", label: "Glazier" },
+  { value: "ROOFER", label: "Roofer" },
+  { value: "DRIVER", label: "Driver" },
 ];
 
 export const EMPLOYMENT_TYPES = [
@@ -46,7 +58,9 @@ export const LEAVE_STATUSES = {
 };
 
 export const EMPLOYEE_STATUSES = {
-  ACTIVE: { label: "Active", badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  ACTIVE: { label: "Active", badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800" },
+  PENDING_APPROVAL: { label: "Pending HR Approval", badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700" },
+  REJECTED: { label: "Rejected by HR", badge: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border border-rose-300 dark:border-rose-700" },
   INACTIVE: { label: "Inactive", badge: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300" },
   ON_LEAVE: { label: "On Leave", badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" },
   TERMINATED: { label: "Terminated", badge: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" },

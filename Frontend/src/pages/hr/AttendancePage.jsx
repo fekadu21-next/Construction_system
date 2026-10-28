@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { hrApi } from "../../services/hrApi.js";
+import { supervisorApi } from "../../services/supervisorApi.js";
 import {
   ATTENDANCE_STATUSES,
   ATTENDANCE_APPROVAL_STATUSES,
@@ -21,19 +22,20 @@ export default function AttendancePage() {
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
 
-  // Tab 1: Daily Entry State
+  // Tab 1: Daily Site Attendance State (Read-only monitoring of supervisor records)
   const [roster, setRoster] = useState([]);
   const [sheetStatus, setSheetStatus] = useState("DRAFT");
+  const [attendanceSummary, setAttendanceSummary] = useState(null);
+  const [projectSummaries, setProjectSummaries] = useState([]);
   const [loadingRoster, setLoadingRoster] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [searchWorker, setSearchWorker] = useState("");
+  const [projectFilter, setProjectFilter] = useState("all");
   const [tradeFilter, setTradeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Review Modal State (for rejection or approval note)
+  // Review Modal State (for supervisor submission approval or rejection note)
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewAction, setReviewAction] = useState("APPROVED");
   const [reviewerNote, setReviewerNote] = useState("");
@@ -59,6 +61,7 @@ export default function AttendancePage() {
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
   const [workerDetail, setWorkerDetail] = useState(null);
   const [loadingWorkerDetail, setLoadingWorkerDetail] = useState(false);
+  const [approvingWorkerId, setApprovingWorkerId] = useState(null);
 
   // Tab 4: Reports State
   const [reportData, setReportData] = useState(null);
@@ -66,9 +69,9 @@ export default function AttendancePage() {
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [loadingReport, setLoadingReport] = useState(false);
 
-  const isHRorGM = ["HR_MANAGER", "GENERAL_MANAGER"].includes(user?.role);
+  const isHRorGM = ["HR_MANAGER", "GENERAL_MANAGER", "ADMIN"].includes(user?.role);
 
-  // Initial Load Projects
+  // Initial Load Projects using supervisorApi endpoint
   useEffect(() => {
     fetchProjects();
   }, []);
@@ -86,43 +89,32 @@ export default function AttendancePage() {
     }
   }, [activeTab, date, selectedProjectId]);
 
-  // Warn on browser unload if unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
   const fetchProjects = async () => {
     try {
-      const res = await hrApi.getProjects();
+      const res = await supervisorApi.getProjects();
       if (res.success) {
-        setProjects(res.data?.projects || []);
+        setProjects(Array.isArray(res.data) ? res.data : res.data?.projects || []);
       }
     } catch {
-      console.warn("Could not load projects");
+      console.warn("Could not load projects from supervisor endpoint");
     }
   };
 
   // -------------------------------------------------------------
-  // TAB 1: DAILY ENTRY & WORKFORCE ROSTER
+  // TAB 1: DAILY SITE ATTENDANCE (SUPERVISOR LOGS)
   // -------------------------------------------------------------
   const fetchDailyAttendance = async () => {
     setLoadingRoster(true);
     setErrorMsg("");
     try {
-      const res = await hrApi.getAttendance({ date, projectId: selectedProjectId });
-      if (res.success) {
-        setRoster(res.data?.roster || []);
-        setSheetStatus(res.data?.approvalStatus || "DRAFT");
-        setHasUnsavedChanges(false);
+      const res = await supervisorApi.getAttendance(selectedProjectId, date);
+      if (res.success && res.data) {
+        setRoster(res.data.roster || []);
+        setSheetStatus(res.data.sheetStatus || "DRAFT");
+        setAttendanceSummary(res.data.summary || null);
+        setProjectSummaries(res.data.projectSummaries || []);
       } else {
-        setErrorMsg(res.error || "Failed to load worker roster");
+        setErrorMsg(res.error || "Failed to load site attendance roster");
       }
     } catch (err) {
       setErrorMsg(err.message || "Failed to load attendance records");
@@ -131,130 +123,26 @@ export default function AttendancePage() {
     }
   };
 
-  const updateWorkerField = (employeeId, field, value) => {
-    setRoster((prev) =>
-      prev.map((item) => {
-        if (item.employee.id !== employeeId) return item;
-        const updated = { ...item, [field]: value };
-
-        // Automatically update times/hours when status changes
-        if (field === "status") {
-          if (value === "PRESENT") {
-            if (!updated.checkInTime) updated.checkInTime = "08:00";
-            if (!updated.checkOutTime) updated.checkOutTime = "17:00";
-            updated.workHours = 8.0;
-          } else if (value === "HALF_DAY") {
-            if (!updated.checkInTime) updated.checkInTime = "08:00";
-            updated.checkOutTime = "12:00";
-            updated.workHours = 4.0;
-          } else if (value === "LATE") {
-            if (!updated.checkInTime) updated.checkInTime = "09:00";
-            if (!updated.checkOutTime) updated.checkOutTime = "17:00";
-            updated.workHours = 7.5;
-          } else if (["ABSENT", "ON_LEAVE", "HOLIDAY", "REST_DAY"].includes(value)) {
-            updated.checkInTime = "";
-            updated.checkOutTime = "";
-            updated.workHours = 0;
-            updated.overtimeHours = 0;
-          }
-        }
-
-        // Automatically calculate workHours if times entered
-        if (field === "checkInTime" || field === "checkOutTime") {
-          const inT = field === "checkInTime" ? value : item.checkInTime;
-          const outT = field === "checkOutTime" ? value : item.checkOutTime;
-          if (inT && outT) {
-            const [inH, inM] = inT.split(":").map(Number);
-            const [outH, outM] = outT.split(":").map(Number);
-            if (!isNaN(inH) && !isNaN(outH)) {
-              let diff = (outH * 60 + outM) - (inH * 60 + inM);
-              if (diff < 0) diff += 24 * 60;
-              if (diff >= 300) diff -= 60; // 1-hour lunch break
-              updated.workHours = Math.round((diff / 60) * 10) / 10;
-            }
-          }
-        }
-
-        return updated;
-      })
-    );
-    setHasUnsavedChanges(true);
-  };
-
-  const handleMarkAll = (status) => {
-    setRoster((prev) =>
-      prev.map((item) => ({
-        ...item,
-        status,
-        checkInTime: status === "PRESENT" ? "08:00" : status === "HALF_DAY" ? "08:00" : "",
-        checkOutTime: status === "PRESENT" ? "17:00" : status === "HALF_DAY" ? "12:00" : "",
-        workHours: status === "PRESENT" ? 8 : status === "HALF_DAY" ? 4 : 0,
-        overtimeHours: status === "PRESENT" ? item.overtimeHours : 0,
-      }))
-    );
-    setHasUnsavedChanges(true);
-  };
-
-  const handleSaveAttendance = async (saveAction = "SAVE") => {
-    setSaving(true);
+  const handleApproveWorkerDirect = async (workerId, workerName) => {
+    if (!workerId) return;
+    setApprovingWorkerId(workerId);
     setErrorMsg("");
     setSuccessMsg("");
-
     try {
-      const records = roster.map((item) => ({
-        employeeId: item.employee.id,
-        projectId: item.employee.assignedProjectId || (selectedProjectId !== "all" ? selectedProjectId : null),
-        status: item.status,
-        checkInTime: item.checkInTime || null,
-        checkOutTime: item.checkOutTime || null,
-        workHours: Number(item.workHours || 0),
-        overtimeHours: Number(item.overtimeHours || 0),
-        notes: item.notes || null,
-      }));
-
-      const res = await hrApi.recordAttendance({
-        date,
-        projectId: selectedProjectId !== "all" ? selectedProjectId : null,
-        records,
-        saveAction,
-      });
-
+      const res = await hrApi.approveEmployee(workerId);
       if (res.success) {
-        setSuccessMsg(res.message || `Attendance records saved successfully.`);
-        setHasUnsavedChanges(false);
-        fetchDailyAttendance();
+        setSuccessMsg(`✓ Daily worker ${workerName || ""} approved and marked ACTIVE in workforce!`);
+        await fetchDailyAttendance();
+        if (selectedWorkerId === workerId) {
+          openWorkerDetail(workerId);
+        }
       } else {
-        setErrorMsg(res.error || "Failed to save attendance");
+        setErrorMsg(res.error || "Failed to approve daily worker");
       }
     } catch (err) {
-      setErrorMsg(err.message || "Failed to record site attendance");
+      setErrorMsg(err.message || "Failed to approve daily worker");
     } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSubmitSheet = async () => {
-    if (hasUnsavedChanges) {
-      await handleSaveAttendance("SUBMIT");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await hrApi.submitAttendance({
-        date,
-        projectId: selectedProjectId !== "all" ? selectedProjectId : null,
-      });
-      if (res.success) {
-        setSuccessMsg(`Attendance sheet for ${date} submitted for review.`);
-        fetchDailyAttendance();
-      } else {
-        setErrorMsg(res.error);
-      }
-    } catch (err) {
-      setErrorMsg(err.message);
-    } finally {
-      setSaving(false);
+      setApprovingWorkerId(null);
     }
   };
 
@@ -273,33 +161,89 @@ export default function AttendancePage() {
         setReviewerNote("");
         fetchDailyAttendance();
       } else {
-        setErrorMsg(res.error);
+        setErrorMsg(res.error || "Failed to update review status");
       }
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || "Failed to update review status");
     } finally {
       setReviewing(false);
     }
   };
 
+  const exportDailyCSV = () => {
+    if (!roster || roster.length === 0) return;
+
+    const headers = [
+      "Worker Code",
+      "Full Name",
+      "Trade",
+      "Project Site",
+      "Site Supervisor",
+      "Status",
+      "Check-In",
+      "Check-Out",
+      "Work Hours",
+      "Overtime Hours",
+      "Approval Status",
+      "Notes",
+    ];
+
+    const rows = roster.map((r) => [
+      r.employeeCode || r.employee?.employeeCode || "",
+      `"${r.fullName || r.employee?.fullName || ""}"`,
+      r.trade || r.employee?.trade || "",
+      `"${r.projectName || r.employee?.assignedProject?.projectName || ""}"`,
+      `"${r.supervisorName || ""}"`,
+      r.status,
+      r.checkInTime || "",
+      r.checkOutTime || "",
+      r.workHours || 0,
+      r.overtimeHours || 0,
+      r.approvalStatus || "DRAFT",
+      `"${(r.notes || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `site_attendance_${date}_${selectedProjectId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Filtered Roster
   const filteredRoster = useMemo(() => {
     return roster.filter((item) => {
+      const name = item.fullName || item.employee?.fullName || "";
+      const code = item.employeeCode || item.employee?.employeeCode || "";
+      const trade = item.trade || item.employee?.trade || "";
+      const projName = item.projectName || item.employee?.assignedProject?.projectName || "";
+      const projCode = item.projectCode || item.employee?.assignedProject?.projectCode || "";
+
+      const query = searchWorker.toLowerCase();
       const matchesSearch =
         !searchWorker ||
-        item.employee.fullName.toLowerCase().includes(searchWorker.toLowerCase()) ||
-        item.employee.employeeCode.toLowerCase().includes(searchWorker.toLowerCase());
+        name.toLowerCase().includes(query) ||
+        code.toLowerCase().includes(query) ||
+        trade.toLowerCase().includes(query) ||
+        projName.toLowerCase().includes(query) ||
+        projCode.toLowerCase().includes(query);
 
-      const matchesTrade = tradeFilter === "all" || item.employee.trade === tradeFilter;
+      const matchesTrade = tradeFilter === "all" || trade === tradeFilter;
       const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+      const matchesProject = projectFilter === "all" || item.projectId === projectFilter;
 
-      return matchesSearch && matchesTrade && matchesStatus;
+      return matchesSearch && matchesTrade && matchesStatus && matchesProject;
     });
-  }, [roster, searchWorker, tradeFilter, statusFilter]);
+  }, [roster, searchWorker, tradeFilter, statusFilter, projectFilter]);
 
   // Attendance stats for selected date
   const stats = useMemo(() => {
-    const present = roster.filter((r) => r.status === "PRESENT").length;
+    const exactPresent = roster.filter((r) => r.status === "PRESENT").length;
     const late = roster.filter((r) => r.status === "LATE").length;
     const halfDay = roster.filter((r) => r.status === "HALF_DAY").length;
     const absent = roster.filter((r) => r.status === "ABSENT").length;
@@ -310,11 +254,11 @@ export default function AttendancePage() {
     const totalHours = roster.reduce((sum, r) => sum + (Number(r.workHours) || 0), 0);
 
     const working = roster.filter((r) => !["HOLIDAY", "REST_DAY", "ON_LEAVE"].includes(r.status)).length;
-    const effectivePresent = present + late + halfDay * 0.5;
+    const effectivePresent = exactPresent + late + halfDay * 0.5;
     const rate = working > 0 ? Math.round((effectivePresent / working) * 100) : 0;
 
     return {
-      present,
+      present: exactPresent,
       late,
       halfDay,
       absent,
@@ -325,6 +269,7 @@ export default function AttendancePage() {
       totalHours: Math.round(totalHours * 10) / 10,
       rate,
       total: roster.length,
+      loggedCount: roster.filter((r) => r.isLogged).length,
     };
   }, [roster]);
 
@@ -478,10 +423,7 @@ export default function AttendancePage() {
             <span className="text-xs font-semibold text-slate-400 uppercase">Site:</span>
             <select
               value={selectedProjectId}
-              onChange={(e) => {
-                if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Change project anyway?")) return;
-                setSelectedProjectId(e.target.value);
-              }}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border focus:ring-2 focus:ring-emerald-500 ${
                 isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800 shadow-2xs"
               }`}
@@ -500,10 +442,7 @@ export default function AttendancePage() {
             <input
               type="date"
               value={date}
-              onChange={(e) => {
-                if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Change date anyway?")) return;
-                setDate(e.target.value);
-              }}
+              onChange={(e) => setDate(e.target.value)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border focus:ring-2 focus:ring-emerald-500 ${
                 isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800 shadow-2xs"
               }`}
@@ -515,17 +454,14 @@ export default function AttendancePage() {
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-1 overflow-x-auto">
         {[
-          { id: "entry", label: "Daily Timesheet Entry", icon: "⏱️" },
+          { id: "entry", label: "Daily Site Attendance", icon: "📋" },
           { id: "dashboard", label: "Attendance Dashboard", icon: "📊" },
           { id: "history", label: "Attendance History & Logs", icon: "📜" },
           { id: "reports", label: "Monthly Labor Reports", icon: "📑" },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => {
-              if (hasUnsavedChanges && !window.confirm("You have unsaved attendance changes. Switch tab anyway?")) return;
-              setActiveTab(tab.id);
-            }}
+            onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === tab.id
                 ? "bg-emerald-600 text-white shadow-xs"
@@ -562,7 +498,7 @@ export default function AttendancePage() {
       )}
 
       {/* ============================================================= */}
-      {/* TAB 1: DAILY ENTRY & WORKFORCE ROSTER                          */}
+      {/* TAB 1: DAILY SITE ATTENDANCE (SUPERVISOR LOGS)                 */}
       {/* ============================================================= */}
       {activeTab === "entry" && (
         <div className="space-y-6">
@@ -570,45 +506,53 @@ export default function AttendancePage() {
           <div className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
             isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"
           }`}>
-            <div className="flex items-center gap-3">
-              <span className="text-xs uppercase font-bold text-slate-400">Sheet Status:</span>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${
-                sheetStatus === "APPROVED"
-                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
-                  : sheetStatus === "SUBMITTED"
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
-                  : sheetStatus === "REJECTED"
-                  ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
-                  : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700"
-              }`}>
-                {ATTENDANCE_APPROVAL_STATUSES[sheetStatus]?.label || sheetStatus}
-              </span>
-
-              {hasUnsavedChanges && (
-                <span className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-500 animate-pulse">
-                  ● Unsaved Changes
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs uppercase font-bold text-slate-400">Sheet Status:</span>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${
+                  sheetStatus === "APPROVED"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                    : sheetStatus === "SUBMITTED"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                    : sheetStatus === "REJECTED"
+                    ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700"
+                }`}>
+                  {ATTENDANCE_APPROVAL_STATUSES[sheetStatus]?.label || sheetStatus}
                 </span>
-              )}
+
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden sm:inline">
+                  {selectedProjectId === "all"
+                    ? `🌐 All Active Sites (${projects.length} Projects)`
+                    : `📍 ${projects.find((p) => p.id === selectedProjectId)?.projectName || "Site"} (Supervisor: ${roster[0]?.supervisorName || "Assigned"})`}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                ℹ️ View-only site attendance recorded directly by Site Supervisors using site attendance endpoints.
+              </p>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => handleSaveAttendance("DRAFT")}
-                disabled={saving || roster.length === 0}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                onClick={fetchDailyAttendance}
+                disabled={loadingRoster}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                   isDark ? "border-slate-700 text-slate-300 hover:bg-slate-800" : "border-slate-300 text-slate-700 hover:bg-slate-50 shadow-2xs"
                 }`}
+                title="Refresh attendance from supervisor endpoint"
               >
-                💾 Save as Draft
+                <span>🔄</span> {loadingRoster ? "Refreshing..." : "Refresh"}
               </button>
 
               <button
-                onClick={handleSubmitSheet}
-                disabled={saving || roster.length === 0}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors"
+                onClick={exportDailyCSV}
+                disabled={roster.length === 0}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                  isDark ? "border-slate-700 text-slate-300 hover:bg-slate-800" : "border-slate-300 text-slate-700 hover:bg-slate-50 shadow-2xs"
+                }`}
               >
-                <span>📤</span> {saving ? "Submitting..." : "Submit for Approval"}
+                <span>📥</span> Export CSV
               </button>
 
               {isHRorGM && (
@@ -618,7 +562,7 @@ export default function AttendancePage() {
                       setReviewAction("APPROVED");
                       setReviewModalOpen(true);
                     }}
-                    disabled={saving || roster.length === 0}
+                    disabled={roster.length === 0}
                     className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors"
                   >
                     <span>✓</span> Approve Sheet
@@ -628,7 +572,7 @@ export default function AttendancePage() {
                       setReviewAction("REJECTED");
                       setReviewModalOpen(true);
                     }}
-                    disabled={saving || roster.length === 0}
+                    disabled={roster.length === 0}
                     className="px-3.5 py-2 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 text-xs font-semibold border border-rose-300 dark:border-rose-800 transition-colors"
                   >
                     <span>✕</span> Return with Note
@@ -637,6 +581,47 @@ export default function AttendancePage() {
               )}
             </div>
           </div>
+
+          {/* Project Breakdown Chips (When All Projects Selected) */}
+          {selectedProjectId === "all" && projectSummaries.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="text-xs font-bold uppercase text-slate-400 shrink-0">Projects:</span>
+              <button
+                onClick={() => setProjectFilter("all")}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold shrink-0 transition-all border ${
+                  projectFilter === "all"
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                    : isDark
+                    ? "bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                All Projects ({roster.length})
+              </button>
+              {projectSummaries.map((ps) => (
+                <button
+                  key={ps.projectId}
+                  onClick={() => setProjectFilter(projectFilter === ps.projectId ? "all" : ps.projectId)}
+                  className={`px-3 py-1 rounded-xl text-xs font-semibold shrink-0 transition-all border flex items-center gap-2 ${
+                    projectFilter === ps.projectId
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                      : isDark
+                      ? "bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800"
+                      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>📍 {ps.projectName}</span>
+                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+                    projectFilter === ps.projectId
+                      ? "bg-emerald-700 text-white"
+                      : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  }`}>
+                    {ps.presentCount}/{ps.totalWorkers} ({ps.attendanceRate}%)
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* KPI Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
@@ -652,7 +637,7 @@ export default function AttendancePage() {
             ].map((kpi, idx) => (
               <div
                 key={idx}
-                className={`p-2 rounded-xl border flex flex-col justify-between ${
+                className={`p-2.5 rounded-xl border flex flex-col justify-between ${
                   isDark ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-200 shadow-2xs"
                 }`}
               >
@@ -665,7 +650,7 @@ export default function AttendancePage() {
             ))}
           </div>
 
-          {/* Table Filters & Quick Mark Bar */}
+          {/* Table Filters Bar */}
           <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
             isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"
           }`}>
@@ -674,15 +659,33 @@ export default function AttendancePage() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search worker..."
+                  placeholder="Search worker, site, trade..."
                   value={searchWorker}
                   onChange={(e) => setSearchWorker(e.target.value)}
-                  className={`w-44 sm:w-52 pl-7 pr-2.5 py-1 rounded-xl text-xs border focus:ring-1 focus:ring-emerald-500 ${
+                  className={`w-48 sm:w-60 pl-7 pr-2.5 py-1 rounded-xl text-xs border focus:ring-1 focus:ring-emerald-500 ${
                     isDark ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500" : "bg-slate-50 border-slate-200 placeholder-slate-400"
                   }`}
                 />
                 <span className="absolute left-2 top-1.5 text-xs text-slate-400">🔍</span>
               </div>
+
+              {/* Project Filter (if all selected) */}
+              {selectedProjectId === "all" && (
+                <select
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold border ${
+                    isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"
+                  }`}
+                >
+                  <option value="all">All Projects</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.projectName}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               {/* Trade Filter */}
               <select
@@ -711,222 +714,224 @@ export default function AttendancePage() {
                   <option key={st.value} value={st.value}>{st.label}</option>
                 ))}
               </select>
+
+              {(searchWorker || tradeFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                <button
+                  onClick={() => {
+                    setSearchWorker("");
+                    setTradeFilter("all");
+                    setStatusFilter("all");
+                    setProjectFilter("all");
+                  }}
+                  className="text-xs text-slate-400 hover:text-emerald-500 font-semibold px-2 py-1"
+                >
+                  Reset Filters
+                </button>
+              )}
             </div>
 
-            {/* Quick Bulk Marking */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold uppercase text-slate-400 mr-1">Bulk:</span>
-              <button
-                type="button"
-                onClick={() => handleMarkAll("PRESENT")}
-                className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 transition-colors"
-              >
-                All Present
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMarkAll("HALF_DAY")}
-                className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-300 dark:border-amber-800 transition-colors"
-              >
-                All Half Day
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMarkAll("ABSENT")}
-                className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-300 dark:border-rose-800 transition-colors"
-              >
-                All Absent
-              </button>
+            <div className="text-xs text-slate-400 font-medium">
+              Showing <span className="font-bold text-slate-700 dark:text-slate-200">{filteredRoster.length}</span> of {roster.length} workers
             </div>
           </div>
 
-          {/* Roster Table */}
+          {/* Roster Table (Read-Only Supervisor Log View) */}
           <div className={`rounded-2xl border overflow-hidden ${
             isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"
           }`}>
-            <div className="w-full overflow-x-hidden">
-              <table className="w-full text-left text-xs border-collapse table-fixed">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead className={`text-[11px] uppercase tracking-wider border-b ${
                   isDark ? "bg-slate-800/40 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"
                 }`}>
                   <tr>
-                    <th className="px-2.5 py-2.5 w-[22%]">Worker</th>
-                    <th className="px-2 py-2.5 w-[16%]">Trade / Site</th>
-                    <th className="px-2 py-2.5 w-[15%]">Status</th>
-                    <th className="px-2 py-2.5 w-[17%]">Check-In / Out</th>
-                    <th className="px-1 py-2.5 text-center w-[6%]">Hours</th>
-                    <th className="px-1 py-2.5 text-center w-[6%]">OT</th>
-                    <th className="px-2 py-2.5 w-[14%]">Notes</th>
-                    <th className="px-1 py-2.5 text-center w-[4%]"></th>
+                    <th className="px-3 py-3">Worker</th>
+                    <th className="px-3 py-3">Project Site / Supervisor</th>
+                    <th className="px-3 py-3">Trade & Team</th>
+                    <th className="px-3 py-3">Site Status</th>
+                    <th className="px-3 py-3 text-center">Shift Times</th>
+                    <th className="px-2 py-3 text-center">Hours</th>
+                    <th className="px-2 py-3 text-center">Overtime</th>
+                    <th className="px-3 py-3">Supervisor Notes</th>
+                    <th className="px-2 py-3 text-center">Approval</th>
+                    <th className="px-2 py-3 text-center"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {loadingRoster ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-12 text-slate-400">
+                      <td colSpan={10} className="text-center py-12 text-slate-400">
                         <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-1.5" />
-                        Loading roster...
+                        Loading site attendance from supervisor endpoint...
                       </td>
                     </tr>
                   ) : filteredRoster.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-12 text-slate-400">
-                        No active employees matching filters found.
+                      <td colSpan={10} className="text-center py-12 text-slate-400">
+                        No attendance records matching filters found for this date.
                       </td>
                     </tr>
                   ) : (
-                    filteredRoster.map((item) => (
-                      <tr
-                        key={item.employee.id}
-                        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
-                      >
-                        {/* Worker Identity */}
-                        <td className="px-2.5 py-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0 shadow-2xs">
-                              {item.employee.fullName.charAt(0)}
-                            </div>
-                            <div className="min-w-0 flex-1 truncate">
-                              <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs truncate" title={item.employee.fullName}>
-                                {item.employee.fullName}
+                    filteredRoster.map((item, idx) => {
+                      const workerId = item.employeeId || item.employee?.id;
+                      const workerName = item.fullName || item.employee?.fullName || "Worker";
+                      const workerCode = item.employeeCode || item.employee?.employeeCode || "N/A";
+                      const trade = item.trade || item.employee?.trade || "GENERAL_LABORER";
+                      const projectName = item.projectName || item.employee?.assignedProject?.projectName || "Unassigned";
+                      const projectCode = item.projectCode || item.employee?.assignedProject?.projectCode || "";
+                      const supervisorName = item.supervisorName || "Assigned Supervisor";
+
+                      return (
+                        <tr
+                          key={item.id || workerId || idx}
+                          className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          {/* Worker Identity */}
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                {workerName.charAt(0)}
                               </div>
-                              <div className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 truncate">
-                                {item.employee.employeeCode}
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs truncate" title={workerName}>
+                                  {workerName}
+                                </div>
+                                <div className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 truncate flex items-center gap-1.5 flex-wrap">
+                                  <span>{workerCode} • {item.employmentType?.replace(/_/g, " ") || "REGULAR"}</span>
+                                  {item.employeeStatus === "PENDING_APPROVAL" && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                                      Pending HR
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Trade & Site */}
-                        <td className="px-2 py-2 text-xs min-w-0">
-                          <div className="font-medium capitalize text-slate-800 dark:text-slate-200 truncate" title={item.employee.trade.replace(/_/g, " ").toLowerCase()}>
-                            {item.employee.trade.replace(/_/g, " ").toLowerCase()}
-                          </div>
-                          <div className="text-slate-400 text-[10px] truncate" title={item.employee.assignedProject?.projectName || "Unassigned"}>
-                            {item.employee.assignedProject?.projectName || "Unassigned"}
-                          </div>
-                        </td>
-
-                        {/* Status Dropdown */}
-                        <td className="px-2 py-2">
-                          <div className="relative w-full">
-                            <select
-                              value={item.status}
-                              onChange={(e) => updateWorkerField(item.employee.id, "status", e.target.value)}
-                              className={`w-full py-1 pl-1.5 pr-4 rounded-lg text-[11px] font-semibold border appearance-none cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-emerald-500 truncate ${
-                                item.status === "PRESENT"
-                                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
-                                  : item.status === "ABSENT"
-                                  ? "bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800"
-                                  : item.status === "HALF_DAY"
-                                  ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800"
-                                  : item.status === "LATE"
-                                  ? "bg-orange-50 text-orange-800 border-orange-300 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800"
-                                  : item.status === "ON_LEAVE"
-                                  ? "bg-blue-50 text-blue-800 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800"
-                                  : "bg-purple-50 text-purple-800 border-purple-300 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800"
-                              }`}
-                            >
-                              {ATTENDANCE_STATUSES.map((st) => (
-                                <option
-                                  key={st.value}
-                                  value={st.value}
-                                  className={isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-800"}
-                                >
-                                  {st.icon} {st.label}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-[9px] opacity-60">
-                              ▾
+                          {/* Trade & Site */}
+                          <td className="px-3 py-2.5 text-xs">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={projectName}>
+                              📍 {projectName} {projectCode ? `(${projectCode})` : ""}
                             </div>
-                          </div>
-                        </td>
+                            <div className="text-slate-400 text-[10px] truncate flex items-center gap-1 mt-0.5">
+                              <span>👷‍♂️</span>
+                              <span>{supervisorName}</span>
+                            </div>
+                          </td>
 
-                        {/* Check-In / Check-Out */}
-                        <td className="px-2 py-2">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="time"
-                              value={item.checkInTime || ""}
-                              onChange={(e) => updateWorkerField(item.employee.id, "checkInTime", e.target.value)}
-                              disabled={["ABSENT", "ON_LEAVE", "HOLIDAY", "REST_DAY"].includes(item.status)}
-                              className={`w-full max-w-[56px] px-0.5 py-0.5 rounded text-[11px] border text-center font-mono focus:ring-1 focus:ring-emerald-500 disabled:opacity-30 ${
-                                isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"
-                              }`}
-                            />
-                            <span className="text-slate-400 text-[10px] shrink-0">-</span>
-                            <input
-                              type="time"
-                              value={item.checkOutTime || ""}
-                              onChange={(e) => updateWorkerField(item.employee.id, "checkOutTime", e.target.value)}
-                              disabled={["ABSENT", "ON_LEAVE", "HOLIDAY", "REST_DAY"].includes(item.status)}
-                              className={`w-full max-w-[56px] px-0.5 py-0.5 rounded text-[11px] border text-center font-mono focus:ring-1 focus:ring-emerald-500 disabled:opacity-30 ${
-                                isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"
-                              }`}
-                            />
-                          </div>
-                        </td>
+                          {/* Trade & Team */}
+                          <td className="px-3 py-2.5 text-xs">
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              {trade.replace(/_/g, " ")}
+                            </span>
+                            <div className="text-slate-400 text-[10px] mt-0.5">
+                              {item.workTeam || "Main Team"}
+                            </div>
+                          </td>
 
-                        {/* Calculated Work Hours */}
-                        <td className="px-1 py-2 text-center font-bold text-xs text-slate-800 dark:text-slate-200">
-                          {item.workHours}h
-                        </td>
-
-                        {/* Overtime Hours */}
-                        <td className="px-1 py-2 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="16"
-                            step="0.5"
-                            value={item.overtimeHours || ""}
-                            onChange={(e) => updateWorkerField(item.employee.id, "overtimeHours", e.target.value)}
-                            placeholder="0"
-                            disabled={["ABSENT", "ON_LEAVE", "HOLIDAY", "REST_DAY"].includes(item.status)}
-                            className={`w-10 px-0.5 py-0.5 rounded text-xs border text-center font-semibold focus:ring-1 focus:ring-emerald-500 disabled:opacity-30 ${
-                              Number(item.overtimeHours) >= 4
-                                ? "border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-600 font-bold"
-                                : isDark
-                                ? "bg-slate-800 border-slate-700 text-white"
-                                : "bg-slate-50 border-slate-200"
-                            }`}
-                          />
-                        </td>
-
-                        {/* Notes / Reason */}
-                        <td className="px-2 py-2">
-                          <input
-                            type="text"
-                            value={item.notes || ""}
-                            onChange={(e) => updateWorkerField(item.employee.id, "notes", e.target.value)}
-                            placeholder={
-                              item.status === "ABSENT"
-                                ? "Absence..."
+                          {/* Status Badge (Read-Only) */}
+                          <td className="px-3 py-2.5">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              item.status === "PRESENT"
+                                ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                : item.status === "ABSENT"
+                                ? "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                                : item.status === "HALF_DAY"
+                                ? "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
                                 : item.status === "LATE"
-                                ? "Lateness..."
-                                : "Notes..."
-                            }
-                            className={`w-full px-1.5 py-0.5 rounded text-[11px] border focus:ring-1 focus:ring-emerald-500 truncate ${
-                              isDark
-                                ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500"
-                                : "bg-slate-50 border-slate-200 placeholder-slate-400"
-                            }`}
-                          />
-                        </td>
+                                ? "bg-orange-50 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-300 dark:border-orange-800"
+                                : item.status === "ON_LEAVE"
+                                ? "bg-blue-50 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
+                                : "bg-purple-50 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800"
+                            }`}>
+                              <span>{ATTENDANCE_STATUSES.find((s) => s.value === item.status)?.icon || "●"}</span>
+                              <span>{ATTENDANCE_STATUSES.find((s) => s.value === item.status)?.label || item.status}</span>
+                            </span>
+                          </td>
 
-                        {/* Inspect Details */}
-                        <td className="px-1 py-2 text-center">
-                          <button
-                            onClick={() => openWorkerDetail(item.employee.id)}
-                            className="p-1 rounded text-slate-400 hover:text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="View Worker Attendance Details"
-                          >
-                            👁️
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                          {/* Check-In / Check-Out Times */}
+                          <td className="px-3 py-2.5 text-center font-mono text-xs">
+                            {item.checkInTime && item.checkOutTime ? (
+                              <span className="text-slate-700 dark:text-slate-300">
+                                {item.checkInTime} - {item.checkOutTime}
+                              </span>
+                            ) : item.checkInTime ? (
+                              <span className="text-slate-700 dark:text-slate-300">In: {item.checkInTime}</span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* Work Hours */}
+                          <td className="px-2 py-2.5 text-center font-bold text-xs text-slate-800 dark:text-slate-200">
+                            {Number(item.workHours) > 0 ? `${item.workHours}h` : "0h"}
+                          </td>
+
+                          {/* Overtime Hours */}
+                          <td className="px-2 py-2.5 text-center">
+                            {Number(item.overtimeHours) > 0 ? (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-800">
+                                +{item.overtimeHours}h OT
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs">0h</span>
+                            )}
+                          </td>
+
+                          {/* Supervisor Notes */}
+                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate" title={item.notes || ""}>
+                            {item.notes ? (
+                              <span className="italic">{item.notes}</span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* Approval Status */}
+                          <td className="px-2 py-2.5 text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              item.approvalStatus === "APPROVED"
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                : item.approvalStatus === "SUBMITTED"
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                                : item.approvalStatus === "REJECTED"
+                                ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                            }`}>
+                              {item.approvalStatus || "DRAFT"}
+                            </span>
+                          </td>
+
+                          {/* Action (Worker Details & Approval) */}
+                          <td className="px-2 py-2.5 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {item.employeeStatus === "PENDING_APPROVAL" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleApproveWorkerDirect(workerId, workerName);
+                                  }}
+                                  disabled={approvingWorkerId === workerId}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Approve Daily Worker Registration"
+                                >
+                                  <span>✓</span> {approvingWorkerId === workerId ? "Approving..." : "Approve Worker"}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => openWorkerDetail(workerId)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title="View Worker Attendance History"
+                              >
+                                👁️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1620,6 +1625,22 @@ export default function AttendancePage() {
                 ✕
               </button>
             </div>
+
+            {workerDetail?.worker?.status === "PENDING_APPROVAL" && (
+              <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+                <div className="text-xs text-amber-600 dark:text-amber-300 font-medium">
+                  This daily laborer was registered on site by the supervisor and is awaiting HR approval.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleApproveWorkerDirect(selectedWorkerId, workerDetail.worker.fullName)}
+                  disabled={approvingWorkerId === selectedWorkerId}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs shrink-0 cursor-pointer"
+                >
+                  {approvingWorkerId === selectedWorkerId ? "Approving..." : "✓ Approve Daily Worker"}
+                </button>
+              </div>
+            )}
 
             {loadingWorkerDetail ? (
               <div className="py-16 text-center text-slate-400 text-xs">

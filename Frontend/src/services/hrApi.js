@@ -61,12 +61,56 @@ export const hrApi = {
     }
   },
 
+  async approveEmployee(id) {
+    try {
+      const response = await api.patch(`/api/hr/employees/${id}/approve`);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to approve employee";
+      return { success: false, error: message };
+    }
+  },
+
+  async rejectEmployee(id, reason = "") {
+    try {
+      const response = await api.patch(`/api/hr/employees/${id}/reject`, { reason });
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to reject employee";
+      return { success: false, error: message };
+    }
+  },
+
   async deleteEmployee(id) {
     try {
       const response = await api.delete(`/api/hr/employees/${id}`);
       return { success: true, message: response.data.message };
     } catch (err) {
       const message = err.response?.data?.message || "Failed to delete employee";
+      return { success: false, error: message };
+    }
+  },
+
+  async getSystemUsers() {
+    try {
+      const response = await api.get("/api/hr/system-users");
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch system users";
+      return { success: false, error: message };
+    }
+  },
+
+  async importUsers(data = {}) {
+    try {
+      const response = await api.post("/api/hr/employees/import-users", data);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message || "Users imported successfully",
+      };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to import system users";
       return { success: false, error: message };
     }
   },
@@ -207,6 +251,46 @@ export const hrApi = {
       return { success: true, data: response.data.data };
     } catch (err) {
       const message = err.response?.data?.message || "Failed to fetch projects";
+      return { success: false, error: message };
+    }
+  },
+
+  async getAvailableWorkers() {
+    try {
+      const response = await api.get("/api/hr/available-workers");
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch available workers";
+      return { success: false, error: message };
+    }
+  },
+
+  async assignWorker(data) {
+    try {
+      const response = await api.post("/api/hr/assignments", data);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to assign worker to project";
+      return { success: false, error: message };
+    }
+  },
+
+  async transferWorker(data) {
+    try {
+      const response = await api.post("/api/hr/assignments/transfer", data);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to transfer worker";
+      return { success: false, error: message };
+    }
+  },
+
+  async getWorkerAssignments(workerId) {
+    try {
+      const response = await api.get(`/api/hr/employees/${workerId}/assignments`);
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch worker assignment history";
       return { success: false, error: message };
     }
   },

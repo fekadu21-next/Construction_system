@@ -19,19 +19,23 @@ const router = express.Router();
 router.use(authenticate);
 
 // Permitted role groups
-const HR_AND_GM = [USER_ROLES.HR_MANAGER, USER_ROLES.GENERAL_MANAGER];
+const HR_AND_GM = [USER_ROLES.HR_MANAGER, USER_ROLES.GENERAL_MANAGER, "ADMIN"];
 const ATTENDANCE_VIEWERS = [
   USER_ROLES.HR_MANAGER,
   USER_ROLES.GENERAL_MANAGER,
   USER_ROLES.PROJECT_MANAGER,
   USER_ROLES.SITE_ENGINEER,
   USER_ROLES.ACCOUNTANT,
+  USER_ROLES.SUPERVISOR,
+  "SUPERVISER",
 ];
 const ATTENDANCE_RECORDERS = [
   USER_ROLES.HR_MANAGER,
   USER_ROLES.GENERAL_MANAGER,
   USER_ROLES.PROJECT_MANAGER,
   USER_ROLES.SITE_ENGINEER,
+  USER_ROLES.SUPERVISOR,
+  "SUPERVISER",
 ];
 const ATTENDANCE_REVIEWERS = [
   USER_ROLES.HR_MANAGER,
@@ -51,11 +55,26 @@ router.get("/next-code", authorize(...HR_AND_GM), hrController.getNextEmployeeCo
 // Projects for site attendance & worker assignment
 router.get("/projects", authorize(...ATTENDANCE_VIEWERS), hrController.getProjects);
 
+// Available & unassigned workers
+router.get("/available-workers", authorize(...HR_AND_GM), hrController.getAvailableWorkers);
+
+// Project Assignments & Transfers (HR & GM)
+router.post("/assignments", authorize(...HR_AND_GM), hrController.assignWorker);
+router.post("/assignments/transfer", authorize(...HR_AND_GM), hrController.transferWorker);
+router.get("/employees/:id/assignments", authorize(...ATTENDANCE_VIEWERS), hrController.getWorkerAssignments);
+
+// System Users & Workforce Import (HR & GM)
+router.get("/system-users", authorize(...HR_AND_GM), hrController.getSystemUsers);
+router.post("/employees/import-users", authorize(...HR_AND_GM), hrController.importUsersToEmployees);
+
 // Workforce CRUD (HR & GM)
 router.get("/employees", authorize(...ATTENDANCE_VIEWERS), hrController.getEmployees);
 router.get("/employees/:id", authorize(...ATTENDANCE_VIEWERS), hrController.getEmployeeById);
 router.post("/employees", authorize(...HR_AND_GM), validateCreateEmployee, hrController.createEmployee);
+router.patch("/employees/:id/approve", authorize(...HR_AND_GM), hrController.approveEmployee);
+router.patch("/employees/:id/reject", authorize(...HR_AND_GM), hrController.rejectEmployee);
 router.patch("/employees/:id", authorize(...HR_AND_GM), validateUpdateEmployee, hrController.updateEmployee);
+router.put("/employees/:id", authorize(...HR_AND_GM), validateUpdateEmployee, hrController.updateEmployee);
 router.delete("/employees/:id", authorize(...HR_AND_GM), hrController.deleteEmployee);
 
 // Site Attendance Management Hub

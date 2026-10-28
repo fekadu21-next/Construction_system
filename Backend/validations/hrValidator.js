@@ -86,28 +86,46 @@ export const validateUpdateEmployee = (req, res, next) => {
     });
   }
 
-  if (trade !== undefined && !Object.values(WORKER_TRADE).includes(trade)) {
-    return res.status(400).json({
-      success: false,
-      message: `Invalid worker trade. Allowed: ${Object.values(WORKER_TRADE).join(", ")}`,
-      field: "trade",
-    });
+  if (trade !== undefined && trade !== null && trade !== "") {
+    const matched = Object.values(WORKER_TRADE).find(
+      (t) => t.toUpperCase() === String(trade).trim().toUpperCase()
+    );
+    if (!matched) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid worker trade "${trade}". Allowed: ${Object.values(WORKER_TRADE).join(", ")}`,
+        field: "trade",
+      });
+    }
+    req.body.trade = matched;
   }
 
-  if (employmentType !== undefined && !Object.values(EMPLOYMENT_TYPE).includes(employmentType)) {
-    return res.status(400).json({
-      success: false,
-      message: `Invalid employment type. Allowed: ${Object.values(EMPLOYMENT_TYPE).join(", ")}`,
-      field: "employmentType",
-    });
+  if (employmentType !== undefined && employmentType !== null && employmentType !== "") {
+    const matched = Object.values(EMPLOYMENT_TYPE).find(
+      (t) => t.toUpperCase() === String(employmentType).trim().toUpperCase()
+    );
+    if (!matched) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid employment type. Allowed: ${Object.values(EMPLOYMENT_TYPE).join(", ")}`,
+        field: "employmentType",
+      });
+    }
+    req.body.employmentType = matched;
   }
 
-  if (status !== undefined && !Object.values(EMPLOYEE_STATUS).includes(status)) {
-    return res.status(400).json({
-      success: false,
-      message: `Invalid status. Allowed: ${Object.values(EMPLOYEE_STATUS).join(", ")}`,
-      field: "status",
-    });
+  if (status !== undefined && status !== null && status !== "") {
+    const matched = Object.values(EMPLOYEE_STATUS).find(
+      (s) => s.toUpperCase() === String(status).trim().toUpperCase()
+    );
+    if (!matched) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Allowed: ${Object.values(EMPLOYEE_STATUS).join(", ")}`,
+        field: "status",
+      });
+    }
+    req.body.status = matched;
   }
 
   if (dailyRate !== undefined && dailyRate !== null && dailyRate !== "") {

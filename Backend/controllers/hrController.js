@@ -33,6 +33,44 @@ export const hrController = {
     }
   },
 
+  async getSystemUsers(req, res, next) {
+    try {
+      const users = await hrService.getSystemUsersForImport();
+      res.json({
+        success: true,
+        data: users,
+      });
+    } catch (error) {
+      console.error("Get system users error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to fetch system users for workforce import",
+      });
+    }
+  },
+
+  async importUsersToEmployees(req, res, next) {
+    try {
+      const actorId = req.userId;
+      const { userIds } = req.body || {};
+      const result = await hrService.importUsersToEmployees(actorId, userIds);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.importedCount > 0
+          ? `Successfully imported ${result.importedCount} user(s) into workforce roster.`
+          : `No new users were imported (${result.skippedCount} already exist in workforce).`,
+      });
+    } catch (error) {
+      console.error("Import users to workforce error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to import users to employee table",
+      });
+    }
+  },
+
   async getEmployees(req, res, next) {
     try {
       const {
@@ -142,16 +180,55 @@ export const hrController = {
           message: "Employee not found",
         });
       }
-      if (error.message === "Assigned project not found") {
-        return res.status(400).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      console.error("Update employee error:", error);
-      res.status(500).json({
+      return res.status(400).json({
         success: false,
         message: error.message || "Unable to update employee",
+      });
+    }
+  },
+
+  async approveEmployee(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actorId = req.userId;
+      const approved = await hrService.approveDailyWorker(id, actorId);
+
+      res.json({
+        success: true,
+        data: approved,
+        message: `Worker ${approved.fullName} (${approved.employeeCode}) approved successfully`,
+      });
+    } catch (error) {
+      console.error("Approve employee error:", error);
+      if (error.message === "Employee not found") {
+        return res.status(404).json({ success: false, message: "Employee not found" });
+      }
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Unable to approve employee",
+      });
+    }
+  },
+
+  async rejectEmployee(req, res, next) {
+    try {
+      const { id } = req.params;
+      const actorId = req.userId;
+      const { reason } = req.body || {};
+      const rejected = await hrService.rejectDailyWorker(id, reason, actorId);
+
+      res.json({
+        success: true,
+        data: rejected,
+        message: `Worker registration rejected`,
+      });
+    } catch (error) {
+      if (error.message === "Employee not found") {
+        return res.status(404).json({ success: false, message: "Employee not found" });
+      }
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Unable to reject employee",
       });
     }
   },
@@ -473,6 +550,63 @@ export const hrController = {
         success: false,
         message: "Unable to fetch projects",
       });
+    }
+  },
+
+  async getAvailableWorkers(req, res, next) {
+    try {
+      const workers = await hrService.getAvailableWorkers();
+      res.json({
+        success: true,
+        data: { workers },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async assignWorker(req, res, next) {
+    try {
+      const assignment = await hrService.assignWorkerToProject(req.body, req.userId);
+      res.status(201).json({
+        success: true,
+        message: "Worker successfully assigned to project",
+        data: assignment,
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Failed to assign worker",
+      });
+    }
+  },
+
+  async transferWorker(req, res, next) {
+    try {
+      const assignment = await hrService.transferWorker(req.body, req.userId);
+      res.json({
+        success: true,
+        message: "Worker successfully transferred to project",
+        data: assignment,
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Failed to transfer worker",
+      });
+    }
+  },
+
+  async getWorkerAssignments(req, res, next) {
+    try {
+      const { id } = req.params;
+      const assignments = await hrService.getWorkerAssignments(id);
+      res.json({
+        success: true,
+        data: { assignments },
+      });
+    } catch (error) {
+      next(error);
     }
   },
 };

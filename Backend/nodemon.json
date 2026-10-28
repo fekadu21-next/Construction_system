@@ -1,0 +1,21 @@
+{
+  "watch": [
+    "controllers",
+    "middlewares",
+    "routes",
+    "services",
+    "config",
+    "constants",
+    "utils",
+    "app.js",
+    "server.js",
+    ".env"
+  ],
+  "ext": "js,mjs,json,env",
+  "ignore": [
+    "tests/**",
+    "scratch/**",
+    "node_modules/**"
+  ],
+  "delay": "500"
+}

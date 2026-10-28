@@ -7,17 +7,30 @@ import path from "node:path";
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(configDir, "../.env");
 
-const result = dotenv.config({ path: envPath });
+const result = dotenv.config({ path: envPath, override: true });
 
 if (result.error) {
   throw new Error(`Failed to load .env file: ${result.error.message}`);
 }
 
+// Ensure Supabase connection pooler uses port 6543 to avoid network timeouts on 5432
+let dbUrl = process.env.DATABASE_URL;
+if (dbUrl && dbUrl.includes("pooler.supabase.com:5432")) {
+  dbUrl = dbUrl.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543");
+  process.env.DATABASE_URL = dbUrl;
+}
+
+let directUrl = process.env.DIRECT_URL;
+if (directUrl && directUrl.includes("pooler.supabase.com:5432")) {
+  directUrl = directUrl.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543");
+  process.env.DIRECT_URL = directUrl;
+}
+
 export const env = {
   PORT: Number(process.env.PORT || 5000),
   NODE_ENV: process.env.NODE_ENV || "development",
-  DATABASE_URL: process.env.DATABASE_URL,
-  DIRECT_URL: process.env.DIRECT_URL,
+  DATABASE_URL: dbUrl,
+  DIRECT_URL: directUrl,
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "15m",
   REFRESH_TOKEN_EXPIRES_IN: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",

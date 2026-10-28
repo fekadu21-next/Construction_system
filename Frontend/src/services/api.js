@@ -29,6 +29,20 @@ const AUTH_WHITELIST = [
   "/api/auth/resend-verification",
 ];
 
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -43,7 +57,19 @@ api.interceptors.response.use(
 
     // Handle token refresh only for protected resource requests that return 401
     if (error.response.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
         const response = await axios.post(
@@ -55,10 +81,14 @@ api.interceptors.response.use(
 
         if (accessToken) {
           localStorage.setItem("accessToken", accessToken);
+          processQueue(null, accessToken);
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return api(originalRequest);
+        } else {
+          throw new Error("No access token returned from refresh");
         }
       } catch (refreshError) {
+        processQueue(refreshError, null);
         localStorage.removeItem("accessToken");
 
         // Do not force reload/redirect if the user is already on an auth page
@@ -68,6 +98,8 @@ api.interceptors.response.use(
           window.location.href = "/login";
         }
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 

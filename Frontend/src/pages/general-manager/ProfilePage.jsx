@@ -1,217 +1,524 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext.jsx";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
+import { useLanguage } from "../../contexts/LanguageContext.jsx";
 import { authService } from "../../services/authService.js";
+import { getRoleLabel } from "../../constants/roles.js";
 
 export default function ProfilePage() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [formData, setFormData] = useState({
-    fullName: user?.fullName || "",
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-  const [profilePhoto, setProfilePhoto] = useState(null);
+  const { user, updateUserData } = useAuth();
+  const { isDark } = useTheme();
+  const { t } = useLanguage();
+
+  // Profile details state
+  const [fullName, setFullName] = useState(user?.fullName || "");
+  const [phone, setPhone] = useState(user?.phone || "");
   const [photoPreview, setPhotoPreview] = useState(user?.profilePhotoUrl || null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [profileError, setProfileError] = useState("");
 
-  const handleProfileUpdate = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
-    try {
-      const result = await authService.changePassword(formData.currentPassword, formData.newPassword);
-      if (result.success) {
-        setSuccess("Password updated successfully");
-        setFormData({ ...formData, currentPassword: "", newPassword: "", confirmPassword: "" });
-      } else {
-        setError(result.error);
-      }
-    } catch (err) {
-      setError("Failed to update profile");
-    } finally {
-      setLoading(false);
+  // Sync state if user changes
+  useEffect(() => {
+    if (user) {
+      setFullName(user.fullName || "");
+      setPhone(user.phone || "");
+      setPhotoPreview(user.profilePhotoUrl || null);
     }
-  };
+  }, [user]);
 
+  // Handle photo selection & conversion to base64
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError("Photo size must be less than 5MB");
-        return;
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError("Photo size must be less than 5MB");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setProfileError("Please select an image file (PNG, JPG, WebP)");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Photo = reader.result;
+      setPhotoPreview(base64Photo);
+      setProfileSaving(true);
+      setProfileError("");
+      setProfileSuccess("");
+
+      try {
+        const res = await authService.updateProfile({ profilePhotoUrl: base64Photo });
+        if (res.success) {
+          updateUserData({
+            profilePhotoUrl: res.data?.profilePhotoUrl || base64Photo,
+            fullName: res.data?.fullName,
+            phone: res.data?.phone,
+          });
+          setProfileSuccess("Profile photo updated successfully!");
+          setTimeout(() => setProfileSuccess(""), 4000);
+        } else {
+          setProfileError(res.error || "Failed to update profile photo");
+        }
+      } catch (err) {
+        setProfileError("Error saving photo");
+      } finally {
+        setProfileSaving(false);
       }
-      if (!file.type.startsWith("image/")) {
-        setError("Please select an image file");
-        return;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Remove photo
+  const handleRemovePhoto = async () => {
+    setProfileSaving(true);
+    setProfileError("");
+    setProfileSuccess("");
+    try {
+      const res = await authService.updateProfile({ profilePhotoUrl: null });
+      if (res.success) {
+        setPhotoPreview(res.data?.profilePhotoUrl || null);
+        updateUserData({
+          profilePhotoUrl: res.data?.profilePhotoUrl || null,
+          fullName: res.data?.fullName,
+          phone: res.data?.phone,
+        });
+        setProfileSuccess("Profile photo removed.");
+        setTimeout(() => setProfileSuccess(""), 4000);
+      } else {
+        setProfileError(res.error || "Failed to remove photo");
       }
-      setProfilePhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
+    } catch {
+      setProfileError("Error removing photo");
+    } finally {
+      setProfileSaving(false);
     }
   };
 
-  const handlePhotoSubmit = async () => {
-    if (!profilePhoto) return;
+  // Update profile details
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    setProfileSaving(true);
+    setProfileError("");
+    setProfileSuccess("");
 
-    setLoading(true);
-    setError("");
-    setSuccess("");
+    if (!fullName.trim()) {
+      setProfileError("Full name is required");
+      setProfileSaving(false);
+      return;
+    }
 
     try {
-      // In a real implementation, you would upload the photo to a server/cloud storage
-      // For now, we'll simulate the upload
-      setTimeout(() => {
-        setSuccess("Profile photo updated successfully");
-        setProfilePhoto(null);
-        setLoading(false);
-      }, 1000);
+      const res = await authService.updateProfile({
+        fullName: fullName.trim(),
+        phone: phone.trim() || null,
+      });
+
+      if (res.success) {
+        updateUserData({
+          fullName: res.data?.fullName || fullName.trim(),
+          phone: res.data?.phone || phone.trim(),
+          profilePhotoUrl: res.data?.profilePhotoUrl,
+        });
+        setProfileSuccess("Personal information updated successfully!");
+        setTimeout(() => setProfileSuccess(""), 4000);
+      } else {
+        setProfileError(res.error || "Failed to update profile");
+      }
     } catch (err) {
-      setError("Failed to upload photo");
-      setLoading(false);
+      setProfileError("Error saving profile changes");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  // Handle password change
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordSaving(true);
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPassword) {
+      setPasswordError("Please enter your current password");
+      setPasswordSaving(false);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters");
+      setPasswordSaving(false);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match");
+      setPasswordSaving(false);
+      return;
+    }
+
+    try {
+      const res = await authService.changePassword(currentPassword, newPassword);
+      if (res.success) {
+        setPasswordSuccess("Password changed successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setTimeout(() => setPasswordSuccess(""), 4000);
+      } else {
+        setPasswordError(res.error || "Failed to change password");
+      }
+    } catch (err) {
+      setPasswordError("Error updating password");
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+          My Profile
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          Manage your personal identity, contact information, and security credentials.
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Profile Photo Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Photo</h2>
-          <div className="flex flex-col items-center">
-            <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mb-4">
+      {/* Main Profile Summary Card */}
+      <div
+        className={`p-6 sm:p-8 rounded-2xl border transition-all duration-200 shadow-sm ${
+          isDark
+            ? "bg-[#0c1830] border-slate-800 text-slate-100"
+            : "bg-white border-slate-200/80 text-slate-900"
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          {/* Avatar with photo or initials */}
+          <div className="relative group shrink-0">
+            <div className="h-24 w-24 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white font-black flex items-center justify-center text-3xl shadow-lg ring-4 ring-blue-500/20 overflow-hidden">
               {photoPreview ? (
-                <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
+                <img
+                  src={photoPreview}
+                  alt={user?.fullName || "General Manager"}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <span className="text-4xl text-gray-400">
-                  {user?.fullName?.charAt(0).toUpperCase()}
-                </span>
+                user?.fullName?.charAt(0).toUpperCase() || "G"
               )}
             </div>
+            <span className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 ring-4 ring-white dark:ring-[#0c1830]" />
+          </div>
+
+          {/* User Meta */}
+          <div className="flex-1 text-center sm:text-left min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white truncate">
+                {user?.fullName || "General Manager"}
+              </h2>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-cyan-300 border border-blue-200 dark:border-blue-800 self-center sm:self-auto">
+                {getRoleLabel(user?.role) || "General Manager"}
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate">
+              {user?.email || "admin@gmail.com"}
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-3.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Active Account
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-blue-500 font-bold">✓</span>
+                {user?.emailVerifiedAt ? "Email Verified" : "Verified"}
+              </span>
+              {user?.phone && (
+                <>
+                  <span>•</span>
+                  <span>📞 {user.phone}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Photo Actions */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <input
               type="file"
+              id="profile-photo-input"
               accept="image/*"
               onChange={handlePhotoUpload}
               className="hidden"
-              id="photo-upload"
             />
-            <label
-              htmlFor="photo-upload"
-              className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors mb-2"
+            <button
+              onClick={() => document.getElementById("profile-photo-input").click()}
+              disabled={profileSaving}
+              className="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-xs"
             >
-              Upload Photo
-            </label>
-            {profilePhoto && (
+              {profileSaving ? "Uploading..." : "Change Photo"}
+            </button>
+            {photoPreview && (
               <button
-                onClick={handlePhotoSubmit}
-                disabled={loading}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                onClick={handleRemovePhoto}
+                disabled={profileSaving}
+                className="px-3 py-2 text-xs font-bold rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                title="Remove photo"
               >
-                {loading ? "Uploading..." : "Save Photo"}
+                Remove
               </button>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Account Information */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Account Information</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input
-                type="text"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                disabled
-              />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Personal Information (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
+          <div
+            className={`p-6 sm:p-7 rounded-2xl border transition-all duration-200 shadow-sm ${
+              isDark
+                ? "bg-[#0c1830] border-slate-800 text-slate-100"
+                : "bg-white border-slate-200/80 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 mb-5 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+              <span className="text-xl">👤</span>
+              <div>
+                <h3 className="text-lg font-black tracking-tight">Personal Information</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Update your contact details and display name.
+                </p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={user?.email || ""}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                disabled
-              />
+
+            {profileSuccess && (
+              <div className="mb-4 p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2">
+                <span>✓</span> {profileSuccess}
+              </div>
+            )}
+
+            {profileError && (
+              <div className="mb-4 p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 flex items-center gap-2">
+                <span>✕</span> {profileError}
+              </div>
+            )}
+
+            <form onSubmit={handleProfileSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  disabled
+                  value={user?.email || "admin@gmail.com"}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Primary login address is managed by system administrator security policies.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="+251 911 000000"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  System Role
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={getRoleLabel(user?.role) || "General Manager"}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase tracking-wider shadow-md shadow-blue-600/30 transition-all disabled:opacity-50"
+                >
+                  {profileSaving ? "Saving..." : "Save Profile Details"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Right Column: Change Password & Account Details (5 cols) */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Change Password Card */}
+          <div
+            className={`p-6 sm:p-7 rounded-2xl border transition-all duration-200 shadow-sm ${
+              isDark
+                ? "bg-[#0c1830] border-slate-800 text-slate-100"
+                : "bg-white border-slate-200/80 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 mb-5 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+              <span className="text-xl">🔐</span>
+              <div>
+                <h3 className="text-lg font-black tracking-tight">Security & Password</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Update your authentication credentials.
+                </p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <input
-                type="text"
-                value={user?.role || ""}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                disabled
-              />
+
+            {passwordSuccess && (
+              <div className="mb-4 p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2">
+                <span>✓</span> {passwordSuccess}
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="mb-4 p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 flex items-center gap-2">
+                <span>✕</span> {passwordError}
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Current Password
+                </label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="Enter current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  New Password
+                </label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="Minimum 6 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Confirm New Password
+                </label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="Re-enter new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="toggle-show-pass"
+                  checked={showPassword}
+                  onChange={(e) => setShowPassword(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded-md border-slate-300 focus:ring-blue-500"
+                />
+                <label htmlFor="toggle-show-pass" className="text-xs text-slate-600 dark:text-slate-400 select-none">
+                  Show passwords
+                </label>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={passwordSaving || !currentPassword || !newPassword}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-wider shadow-md transition-all disabled:opacity-50"
+                >
+                  {passwordSaving ? "Updating Password..." : "Update Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Account Overview Box */}
+          <div
+            className={`p-6 rounded-2xl border transition-all duration-200 shadow-sm ${
+              isDark
+                ? "bg-[#0c1830] border-slate-800 text-slate-100"
+                : "bg-white border-slate-200/80 text-slate-900"
+            }`}
+          >
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4">
+              Account Metadata
+            </h4>
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500">Account ID:</span>
+                <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                  {user?.id ? `${user.id.slice(0, 12)}...` : "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500">Session Status:</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  ● Authenticated
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-500">Access Scope:</span>
+                <span className="font-bold text-blue-600 dark:text-cyan-400">
+                  Executive Admin
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Change Password */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Change Password</h2>
-        <form onSubmit={handleProfileUpdate} className="space-y-4 max-w-md">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Current Password
-            </label>
-            <input
-              type="password"
-              required
-              value={formData.currentPassword}
-              onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              New Password
-            </label>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={formData.newPassword}
-              onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm New Password
-            </label>
-            <input
-              type="password"
-              required
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded p-2 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="bg-green-50 border border-green-200 rounded p-2 text-sm text-green-700">
-              {success}
-            </div>
-          )}
-          <button
-            type="submit"
-            disabled={loading || formData.newPassword !== formData.confirmPassword}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {loading ? "Updating..." : "Update Password"}
-          </button>
-        </form>
       </div>
     </div>
   );

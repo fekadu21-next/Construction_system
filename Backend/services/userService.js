@@ -99,22 +99,22 @@ export const userService = {
    * Return dynamic summary statistics for the User Management dashboard
    */
   async getUserSummary() {
-    const [totalUsers, activeUsers, inactiveUsers, rolesCount, roleBreakdown] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { isActive: true } }),
-      prisma.user.count({ where: { isActive: false } }),
-      prisma.role.count(),
+    const totalUsers = await prisma.user.count();
+    const activeUsers = await prisma.user.count({ where: { isActive: true } });
+    const inactiveUsers = Math.max(0, totalUsers - activeUsers);
+
+    const [roleBreakdown, roles] = await Promise.all([
       prisma.user.groupBy({
         by: ["roleId"],
         _count: { id: true },
       }),
+      prisma.role.findMany({
+        select: { id: true, name: true, description: true },
+        orderBy: { name: "asc" },
+      }),
     ]);
 
-    // Fetch role details for breakdown
-    const roles = await prisma.role.findMany({
-      select: { id: true, name: true, description: true },
-      orderBy: { name: "asc" },
-    });
+    const rolesCount = roles.length;
 
     const breakdown = roles.map((r) => {
       const found = roleBreakdown.find((b) => b.roleId === r.id);

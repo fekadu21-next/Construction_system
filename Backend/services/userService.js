@@ -1,5 +1,6 @@
 import { hashPassword, normalizeEmail } from "../utils/auth.js";
 import prisma from "../config/prisma.js";
+import { WORKER_TRADE } from "../constants/hrConstants.js";
 
 export const userService = {
   /**
@@ -129,7 +130,7 @@ export const userService = {
       totalUsers,
       activeUsers,
       inactiveUsers,
-      rolesCount: rolesCount || 6,
+      rolesCount: rolesCount || 7,
       breakdown,
     };
   },
@@ -225,17 +226,19 @@ export const userService = {
       throw new Error("Email already exists");
     }
 
-    // Resolve role by id or role name
+    // Resolve role by id or role name (with SUPERVISER alias support)
     let role = null;
-    if (data.roleId) {
+    const resolvedRoleId = data.roleId === "SUPERVISER" ? "SUPERVISOR" : data.roleId;
+    const resolvedRoleName = data.role === "SUPERVISER" ? "SUPERVISOR" : data.role;
+    if (resolvedRoleId) {
       role = await prisma.role.findFirst({
         where: {
-          OR: [{ id: data.roleId }, { name: data.roleId }],
+          OR: [{ id: resolvedRoleId }, { name: resolvedRoleId }],
         },
       });
-    } else if (data.role) {
+    } else if (resolvedRoleName) {
       role = await prisma.role.findUnique({
-        where: { name: data.role },
+        where: { name: resolvedRoleName },
       });
     }
 
@@ -294,6 +297,46 @@ export const userService = {
       },
     });
 
+    // Auto-sync into employee table since all company users are employees
+    try {
+      const normalizedUserEmail = user.email.toLowerCase().trim();
+      const existingEmployee = await prisma.employee.findFirst({
+        where: { email: { equals: normalizedUserEmail, mode: "insensitive" } },
+      });
+
+      if (!existingEmployee) {
+        const employees = await prisma.employee.findMany({ select: { employeeCode: true } });
+        let maxNum = 0;
+        employees.forEach((emp) => {
+          const match = emp.employeeCode?.match(/^EMP-(\d+)$/);
+          if (match) {
+            const n = parseInt(match[1], 10);
+            if (n > maxNum) maxNum = n;
+          }
+        });
+        const employeeCode = `EMP-${String(maxNum + 1).padStart(4, "0")}`;
+        const userRole = user.role?.name || "SITE_LABORER";
+        const trade = WORKER_TRADE[userRole] ? userRole : "SITE_LABORER";
+
+        await prisma.employee.create({
+          data: {
+            employeeCode,
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.phone?.trim() || "+251900000000",
+            trade,
+            employmentType: "FULL_TIME",
+            status: user.isActive ? "ACTIVE" : "INACTIVE",
+            hireDate: new Date(),
+            workTeam: "Executive & Staff",
+            currency: "ETB",
+          },
+        });
+      }
+    } catch (empSyncErr) {
+      console.warn("Auto-syncing new user to employee table warning:", empSyncErr.message);
+    }
+
     return user;
   },
 
@@ -339,7 +382,8 @@ export const userService = {
 
     // Role update safeguard: Cannot demote the last active General Manager
     if (data.roleId || data.role) {
-      const targetRoleIdentifier = data.roleId || data.role;
+      const rawIdentifier = data.roleId || data.role;
+      const targetRoleIdentifier = rawIdentifier === "SUPERVISER" ? "SUPERVISOR" : rawIdentifier;
       const targetRole = await prisma.role.findFirst({
         where: {
           OR: [{ id: targetRoleIdentifier }, { name: targetRoleIdentifier }],
@@ -452,6 +496,22 @@ export const userService = {
           },
         },
       });
+    }
+
+    // Sync updated info with employee record if user is registered in workforce
+    try {
+      if (user.email && (updateData.fullName || updateData.phone || updateData.isActive !== undefined)) {
+        await prisma.employee.updateMany({
+          where: { email: { equals: user.email, mode: "insensitive" } },
+          data: {
+            ...(updateData.fullName ? { fullName: updateData.fullName } : {}),
+            ...(updateData.phone ? { phone: updateData.phone } : {}),
+            ...(updateData.isActive !== undefined ? { status: updateData.isActive ? "ACTIVE" : "INACTIVE" } : {}),
+          },
+        });
+      }
+    } catch (syncErr) {
+      console.warn("User update employee sync warning:", syncErr.message);
     }
 
     return updatedUser;

@@ -15,3 +15,29 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Visible modern custom scrollbars for horizontal tables & panels */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #091122;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 9px;
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #091122;
+  border-radius: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 6px;
+  border: 1px solid #1e293b;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

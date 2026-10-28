@@ -42,6 +42,18 @@ const ROLE_CONFIGS = {
     badgeClass: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
     dotClass: "bg-indigo-500",
   },
+  SUPERVISOR: {
+    label: "Supervisor",
+    description: "Supervises site workforce and daily construction activities.",
+    badgeClass: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-800",
+    dotClass: "bg-teal-500",
+  },
+  SUPERVISER: {
+    label: "Supervisor",
+    description: "Supervises site workforce and daily construction activities.",
+    badgeClass: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-800",
+    dotClass: "bg-teal-500",
+  },
 };
 
 export default function UsersPage() {
@@ -55,7 +67,7 @@ export default function UsersPage() {
     totalUsers: 0,
     activeUsers: 0,
     inactiveUsers: 0,
-    rolesCount: 6,
+    rolesCount: 7,
   });
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);

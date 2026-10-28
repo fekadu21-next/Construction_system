@@ -151,6 +151,21 @@ const translations = {
     language: "Language",
     english: "English",
     amharic: "አማርኛ (Amharic)",
+
+    // HR Module
+    hrPortalTitle: "Human Resources Portal",
+    hrSuite: "HR Suite",
+    workforceManagement: "Workforce Management",
+    workforceAndHr: "Workforce & HR",
+    allEmployees: "All Employees",
+    workforceRoster: "Workforce Roster",
+    dailyAttendance: "Daily Attendance",
+    leaveRequests: "Leave Requests",
+    laborAndPayroll: "Labor & Payroll",
+    realTimeActive: "Real-time Active",
+    noNotificationsYet: "No notifications yet",
+    markAllRead: "Mark all read",
+    viewAllNotifications: "View all notifications →",
   },
 
   am: {
@@ -303,6 +318,21 @@ const translations = {
     language: "ቋንቋ",
     english: "English",
     amharic: "አማርኛ",
+
+    // HR Module
+    hrPortalTitle: "የሰው ኃይል መምሪያ ፖርታል",
+    hrSuite: "የሰው ኃይል",
+    workforceManagement: "የሰው ኃይል አስተዳደር",
+    workforceAndHr: "የሰው ኃይል እና አስተዳደር",
+    allEmployees: "ሁሉም ሠራተኞች",
+    workforceRoster: "የሠራተኞች መዝገብ",
+    dailyAttendance: "ዕለታዊ የሥራ ክትትል",
+    leaveRequests: "የዕረፍት ጥያቄዎች",
+    laborAndPayroll: "የደመወዝ ክፍያ",
+    realTimeActive: "በቀጥታ ንቁ",
+    noNotificationsYet: "ምንም ማሳወቂያዎች የሉም",
+    markAllRead: "ሁሉንም እንደተነበበ ምልክት አድርግ",
+    viewAllNotifications: "ሁሉንም ማሳወቂያዎች ይመልከቱ →",
   },
 };
 

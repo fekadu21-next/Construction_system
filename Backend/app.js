@@ -7,7 +7,14 @@ import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import hrRoutes from "./routes/hrRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import supervisorRoutes from "./routes/supervisorRoutes.js";
+import accountantRoutes from "./routes/accountantRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 import preferencesRoutes from "./routes/preferencesRoutes.js";
+import projectManagerRoutes from "./routes/project-manager/projectManagerRoutes.js";
+import siteEngineerRoutes from "./routes/site-engineer/siteEngineerRoutes.js";
 
 const app = express();
 
@@ -79,6 +86,28 @@ app.use("/api/projects", projectRoutes);
 
 // Dashboard routes (General Manager only)
 app.use("/api/general-manager", dashboardRoutes);
+
+// HR and workforce management routes (HR Manager and General Manager)
+app.use("/api/hr", hrRoutes);
+
+// Site Supervisor routes
+app.use("/api/supervisor", supervisorRoutes);
+
+// Project Accounting & Cost Control routes
+app.use("/api/accountant", accountantRoutes);
+
+// AI analytics and prediction routes
+app.use("/api/ai", aiRoutes);
+
+// Real-time notifications routes
+app.use("/api/notifications", notificationRoutes);
+// Project Manager routes (supporting standard and v1 endpoints)
+app.use("/api/project-manager", projectManagerRoutes);
+app.use("/api/v1/project-manager", projectManagerRoutes);
+
+// Site Engineer routes (supporting standard and v1 endpoints)
+app.use("/api/site-engineer", siteEngineerRoutes);
+app.use("/api/v1/site-engineer", siteEngineerRoutes);
 
 // User preferences routes
 app.use("/api/preferences", preferencesRoutes);

@@ -1,0 +1,84 @@
+export const EMPLOYMENT_TYPE = {
+  FULL_TIME: "FULL_TIME",
+  CONTRACT: "CONTRACT",
+  DAILY_LABORER: "DAILY_LABORER",
+  INTERN: "INTERN",
+};
+
+export const WORKER_TRADE = {
+  GENERAL_MANAGER: "GENERAL_MANAGER",
+  PROJECT_MANAGER: "PROJECT_MANAGER",
+  HR_MANAGER: "HR_MANAGER",
+  SITE_ENGINEER: "SITE_ENGINEER",
+  ACCOUNTANT: "ACCOUNTANT",
+  PROCUREMENT_OFFICER: "PROCUREMENT_OFFICER",
+  SUPERVISOR: "SUPERVISOR",
+  FOREMAN: "FOREMAN",
+  SURVEYOR: "SURVEYOR",
+  SAFETY_OFFICER: "SAFETY_OFFICER",
+  CARPENTER: "CARPENTER",
+  MASON: "MASON",
+  ELECTRICIAN: "ELECTRICIAN",
+  PLUMBER: "PLUMBER",
+  WELDER: "WELDER",
+  HEAVY_EQUIPMENT_OPERATOR: "HEAVY_EQUIPMENT_OPERATOR",
+  SITE_LABORER: "SITE_LABORER",
+  STEEL_FIXER: "STEEL_FIXER",
+  PAINTER: "PAINTER",
+  SCAFFOLDER: "SCAFFOLDER",
+  PLASTERER: "PLASTERER",
+  TILER: "TILER",
+  GLAZIER: "GLAZIER",
+  ROOFER: "ROOFER",
+  DRIVER: "DRIVER",
+};
+
+export const ATTENDANCE_STATUS = {
+  PRESENT: "PRESENT",
+  ABSENT: "ABSENT",
+  HALF_DAY: "HALF_DAY",
+  LATE: "LATE",
+  ON_LEAVE: "ON_LEAVE",
+  HOLIDAY: "HOLIDAY",
+  REST_DAY: "REST_DAY",
+};
+
+export const ATTENDANCE_APPROVAL_STATUS = {
+  DRAFT: "DRAFT",
+  SUBMITTED: "SUBMITTED",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+};
+
+export const ATTENDANCE_VALUE_RULES = {
+  PRESENT: { dayValue: 1.0, isCountedPresent: true, defaultHours: 8.0 },
+  LATE: { dayValue: 1.0, isCountedPresent: true, defaultHours: 7.5 },
+  HALF_DAY: { dayValue: 0.5, isCountedPresent: true, defaultHours: 4.0 },
+  ABSENT: { dayValue: 0.0, isCountedPresent: false, defaultHours: 0.0 },
+  ON_LEAVE: { dayValue: 0.0, isCountedPresent: false, isLeave: true, defaultHours: 0.0 },
+  HOLIDAY: { dayValue: 0.0, isCountedPresent: false, isHoliday: true, defaultHours: 0.0 },
+  REST_DAY: { dayValue: 0.0, isCountedPresent: false, isRestDay: true, defaultHours: 0.0 },
+};
+
+export const LEAVE_STATUS = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+  CANCELLED: "CANCELLED",
+};
+
+export const LEAVE_TYPES = {
+  ANNUAL: "ANNUAL",
+  SICK: "SICK",
+  EMERGENCY: "EMERGENCY",
+  UNPAID: "UNPAID",
+};
+
+export const EMPLOYEE_STATUS = {
+  ACTIVE: "ACTIVE",
+  PENDING_APPROVAL: "PENDING_APPROVAL",
+  REJECTED: "REJECTED",
+  INACTIVE: "INACTIVE",
+  ON_LEAVE: "ON_LEAVE",
+  TERMINATED: "TERMINATED",
+};

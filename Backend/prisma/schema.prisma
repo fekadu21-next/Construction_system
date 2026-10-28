@@ -14,29 +14,27 @@ model Role {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  users User[]
+  users       User[]
 
   @@map("roles")
 }
 
 model User {
-  id                      String    @id @default(uuid())
-  fullName                String
-  email                   String    @unique
-  passwordHash            String
-  roleId                  String
-  isActive                Boolean   @default(true)
-  phone                   String?
-  emailVerifiedAt         DateTime?
-  emailVerificationToken   String?
+  id                         String    @id @default(uuid())
+  fullName                   String
+  email                      String    @unique
+  passwordHash               String
+  roleId                     String
+  isActive                   Boolean   @default(true)
+  phone                      String?
+  emailVerifiedAt            DateTime?
+  emailVerificationToken     String?
   emailVerificationExpiresAt DateTime?
-  mustChangePassword      Boolean   @default(false)
-  profilePhotoUrl         String?
-  preferences             Json?
-  createdById             String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  mustChangePassword         Boolean   @default(false)
+  profilePhotoUrl            String?
+  createdById                String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   role                 Role              @relation(fields: [roleId], references: [id])
   refreshSessions      RefreshSession[]
@@ -44,8 +42,51 @@ model User {
   createdBy            User?             @relation("UserCreator", fields: [createdById], references: [id])
   createdUsers         User[]            @relation("UserCreator")
   managedProjects      Project[]         @relation("ProjectManager")
+  supervisedProjects   Project[]         @relation("ProjectSupervisor")
   createdProjects      Project[]         @relation("ProjectCreator")
   auditLogs            AuditLog[]
+  reportedIncidents    SiteIncident[]    @relation("IncidentReporter")
+  resolvedIncidents    SiteIncident[]    @relation("IncidentResolver")
+  materialRequests     MaterialRequest[] @relation("MaterialRequester")
+  id                         String               @id @default(uuid())
+  fullName                   String
+  email                      String               @unique
+  passwordHash               String
+  roleId                     String
+  isActive                   Boolean              @default(true)
+  emailVerifiedAt            DateTime?
+  emailVerificationToken     String?
+  emailVerificationExpiresAt DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  createdById                String?
+  mustChangePassword         Boolean              @default(false)
+  profilePhotoUrl            String?
+  phone                      String?
+  preferences                Json?
+  auditLogs                  AuditLog[]
+  materials                  materials[]
+  passwordResetTokens        PasswordResetToken[]
+  createdProjects            Project[]            @relation("ProjectCreator")
+  managedProjects            Project[]            @relation("ProjectManager")
+  refreshSessions            RefreshSession[]
+  stock_movements            stock_movements[]
+  suppliers                  suppliers[]
+  createdBy                  User?                @relation("UserCreator", fields: [createdById], references: [id])
+  createdUsers               User[]               @relation("UserCreator")
+  role                       Role                 @relation(fields: [roleId], references: [id])
+
+  // Project Manager & Site Engineer relations
+  assignedMilestones   Milestone[]         @relation("EngineerMilestones")
+  submittedReports     ProgressReport[]    @relation("EngineerReports")
+  reviewedReports      ProgressReport[]    @relation("PMReviewedReports")
+  requestedMaterials   MaterialRequest[]   @relation("RequestedMaterials")
+  reviewedMaterials    MaterialRequest[]   @relation("ReviewedMaterials")
+  recordedExpenses     ProjectExpense[]    @relation("RecordedExpenses")
+  siteEngineerProjects Project[]           @relation("ProjectSiteEngineer")
+  assignedTasks        Task[]              @relation("AssignedTasks")
+  siteActivities       DailySiteActivity[] @relation("EngineerActivities")
+  recordedAttendances  attendances[]       @relation("RecordedAttendances")
 
   @@index([roleId])
   @@index([isActive])
@@ -55,20 +96,23 @@ model User {
 }
 
 model RefreshSession {
-  id                 String    @id @default(uuid())
-  userId             String
-  tokenHash          String    @unique
-  expiresAt          DateTime
-  revokedAt          DateTime?
-  replacedBySessionId String?   @unique
-  userAgent          String?
-  ipAddress          String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                  String          @id @default(uuid())
+  userId              String
+  tokenHash           String          @unique
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedBySessionId String?         @unique
+  userAgent           String?
+  ipAddress           String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  replacedBy   RefreshSession? @relation("SessionReplacement", fields: [replacedBySessionId], references: [id])
-  replaces     RefreshSession? @relation("SessionReplacement")
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy RefreshSession? @relation("SessionReplacement", fields: [replacedBySessionId], references: [id])
+  replaces   RefreshSession? @relation("SessionReplacement")
+  replacedBy          RefreshSession? @relation("SessionReplacement", fields: [replacedBySessionId], references: [id])
+  replaces            RefreshSession? @relation("SessionReplacement")
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
@@ -77,14 +121,15 @@ model RefreshSession {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
@@ -93,42 +138,305 @@ model PasswordResetToken {
 }
 
 model Project {
-  id                String    @id @default(uuid())
-  projectName       String
-  projectCode       String    @unique
-  description       String?
-  location          String
-  startDate         DateTime
-  endDate           DateTime?
-  budget            Decimal   @db.Decimal(15, 2)
-  currency          String    @default("ETB")
-  status            ProjectStatus @default(PLANNED)
-  projectManagerId  String?
-  createdById       String
-  archivedAt        DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String        @id @default(uuid())
+  projectName      String
+  projectCode      String        @unique
+  description      String?
+  location         String
+  startDate        DateTime
+  endDate          DateTime?
+  budget           Decimal       @db.Decimal(15, 2)
+  currency         String        @default("ETB")
+  status           ProjectStatus @default(PLANNED)
+  projectManagerId String?
+  supervisorId     String?
+  siteEngineerId   String?
+  createdById      String
+  archivedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  projectManager User?            @relation("ProjectManager", fields: [projectManagerId], references: [id])
-  createdBy       User            @relation("ProjectCreator", fields: [createdById], references: [id])
+  projectManager   User?         @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  supervisor       User?         @relation("ProjectSupervisor", fields: [supervisorId], references: [id])
+  createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
+
+  employees        Employee[]
+  attendances      Attendance[]
+  assignments      ProjectAssignment[]
+  incidents        SiteIncident[]
+  budgets          ProjectBudget[]
+  expenses         ProjectExpense[]
+  supplierInvoices SupplierInvoice[]
+  payments         Payment[]
+  aiPredictions    AiPrediction[]
+  tasks            Task[]
+  materialRequests MaterialRequest[]
+  activities       DailySiteActivity[]
 
   @@index([projectManagerId])
+  @@index([supervisorId])
+  status           ProjectStatus @default(PLANNED)
+  projectManagerId String?
+  siteEngineerId   String?
+  createdById      String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  currency         String        @default("ETB")
+  archivedAt       DateTime?
+  employees        employees[]
+  createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
+  projectManager   User?         @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  siteEngineer     User?         @relation("ProjectSiteEngineer", fields: [siteEngineerId], references: [id])
+
+  // Operational relations
+  milestones       Milestone[]
+  tasks            Task[]
+  dailyActivities  DailySiteActivity[]
+  progressReports  ProgressReport[]
+  materialRequests MaterialRequest[]
+  expenses         ProjectExpense[]
+  attendances      attendances[]
+
+  @@index([projectManagerId])
+  @@index([siteEngineerId])
   @@index([createdById])
   @@index([status])
   @@index([archivedAt])
   @@map("projects")
 }
 
+model Employee {
+  id                    String              @id @default(uuid())
+  employeeCode          String              @unique
+  fullName              String
+  phone                 String
+  email                 String?
+  address               String?
+  trade                 String              // CARPENTER, MASON, ELECTRICIAN, etc.
+  employmentType        String              @default("DAILY_LABORER") // FULL_TIME, CONTRACT, DAILY_LABORER
+  dailyRate             Decimal?            @db.Decimal(10, 2)
+  monthlySalary         Decimal?            @db.Decimal(10, 2)
+  currency              String              @default("ETB")
+  status                String              @default("ACTIVE") // ACTIVE, INACTIVE, ON_LEAVE, ARCHIVED
+  nationalId            String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  hireDate              DateTime?           @db.Date
+  workTeam              String?
+  assignedProjectId     String?
+  assignedProject       Project?            @relation(fields: [assignedProjectId], references: [id], onDelete: SetNull)
+  attendanceLogs        Attendance[]
+  leaveRequests         LeaveRequest[]
+  projectAssignments    ProjectAssignment[]
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([trade])
+  @@index([status])
+  @@index([assignedProjectId])
+  @@map("employees")
+}
+
+model ProjectAssignment {
+  id           String    @id @default(uuid())
+  employeeId   String
+  projectId    String
+  jobRole      String
+  workTeam     String?
+  startDate    DateTime  @db.Date
+  endDate      DateTime? @db.Date
+  status       String    @default("ACTIVE") // ACTIVE, TRANSFERRED, COMPLETED, CANCELLED
+  notes        String?
+  assignedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([projectId])
+  @@index([status])
+  @@map("project_assignments")
+}
+
+model Attendance {
+  id               String    @id @default(uuid())
+  employeeId       String
+  projectId        String?
+  date             DateTime  @db.Date
+  status           String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY, LATE, ON_LEAVE, HOLIDAY, REST_DAY
+  checkInTime      String?   // e.g. "08:00"
+  checkOutTime     String?   // e.g. "17:00"
+  workHours        Decimal   @default(8.00) @db.Decimal(4, 2)
+  overtimeHours    Decimal   @default(0.00) @db.Decimal(4, 2)
+  notes            String?
+  approvalStatus   String    @default("APPROVED") // DRAFT, SUBMITTED, APPROVED, REJECTED
+  recordedById     String?
+  reviewedById     String?
+  correctionReason String?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  team             String?
+  laborCostPosted  Boolean   @default(false)
+  expenseId        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, date])
+  @@index([projectId])
+  @@index([date])
+  @@index([approvalStatus])
+  @@map("attendances")
+}
+
+model LeaveRequest {
+  id           String    @id @default(uuid())
+  employeeId   String
+  leaveType    String    // ANNUAL, SICK, EMERGENCY, UNPAID
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewerNote String?
+  reviewedById String?
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@map("leave_requests")
+model Milestone {
+  id                 String          @id @default(uuid())
+  projectId          String
+  milestoneName      String
+  description        String?
+  dueDate            DateTime
+  status             MilestoneStatus @default(UPCOMING)
+  progressPercent    Int             @default(0)
+  assignedEngineerId String?
+  createdById        String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  project          Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedEngineer User?   @relation("EngineerMilestones", fields: [assignedEngineerId], references: [id])
+  tasks            Task[]
+
+  @@index([projectId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("milestones")
+}
+
+model ProgressReport {
+  id                String             @id @default(uuid())
+  projectId         String
+  siteEngineerId    String
+  reportTitle       String
+  workCompleted     String
+  reportedProgress  String
+  issuesOrDelays    String?
+  weatherConditions String?
+  laborCount        Int?
+  equipmentActive   String?
+  photosAttached    Int                @default(0)
+  reviewStatus      ReportReviewStatus @default(PENDING_REVIEW)
+  reviewedById      String?
+  reviewedAt        DateTime?
+  reviewerNotes     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteEngineer User    @relation("EngineerReports", fields: [siteEngineerId], references: [id])
+  reviewedBy   User?   @relation("PMReviewedReports", fields: [reviewedById], references: [id])
+
+  @@index([projectId])
+  @@index([siteEngineerId])
+  @@index([reviewStatus])
+  @@map("progress_reports")
+}
+
+model MaterialRequest {
+  id                 String                @id @default(uuid())
+  requestNumber      String                @unique
+  projectId          String
+  requestedById      String
+  requestedMaterials String
+  totalEstimatedCost Decimal?              @db.Decimal(15, 2)
+  urgency            RequestUrgency        @default(NORMAL)
+  status             MaterialRequestStatus @default(PENDING)
+  justification      String?
+  deliveryLocation   String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reviewNotes        String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy User                  @relation("RequestedMaterials", fields: [requestedById], references: [id])
+  reviewedBy  User?                 @relation("ReviewedMaterials", fields: [reviewedById], references: [id])
+  items       MaterialRequestItem[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([urgency])
+  @@map("material_requests")
+}
+
+model MaterialRequestItem {
+  id                String   @id @default(uuid())
+  materialRequestId String
+  itemName          String
+  quantity          Decimal  @db.Decimal(12, 2)
+  unit              String
+  estimatedUnitCost Decimal? @db.Decimal(15, 2)
+  createdAt         DateTime @default(now())
+
+  materialRequest MaterialRequest @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
+
+  @@index([materialRequestId])
+  @@map("material_request_items")
+}
+
+model ProjectExpense {
+  id           String   @id @default(uuid())
+  projectId    String
+  category     String
+  amount       Decimal  @db.Decimal(15, 2)
+  currency     String   @default("ETB")
+  description  String?
+  expenseDate  DateTime
+  recordedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recordedBy User?   @relation("RecordedExpenses", fields: [recordedById], references: [id])
+
+  @@index([projectId])
+  @@index([category])
+  @@index([expenseDate])
+  @@map("project_expenses")
+}
+
 model AuditLog {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   actorUserId String?
   action      String
   entityType  String
   entityId    String?
   details     Json?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
   actor User? @relation(fields: [actorUserId], references: [id])
+  actor       User?    @relation(fields: [actorUserId], references: [id])
 
   @@index([actorUserId])
   @@index([entityType])
@@ -137,10 +445,571 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model Notification {
+  id              String   @id @default(uuid())
+  recipientRole   String?
+  recipientUserId String?
+  title           String
+  message         String
+  type            String   @default("INFO") // INFO, WARNING, SUCCESS, ACTION
+  category        String   @default("GENERAL") // LEAVE, ATTENDANCE, WORKFORCE, PAYROLL, TASK, MATERIAL, FINANCE, BUDGET, INCIDENT, AI
+  link            String?
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([recipientRole])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model SiteIncident {
+  id           String    @id @default(uuid())
+  projectId    String
+  reportedById String
+  title        String
+  description  String
+  incidentType String    @default("SAFETY") // SAFETY, DELAY, MATERIAL_SHORTAGE, EQUIPMENT_BREAKDOWN, WEATHER, OTHER
+  severity     String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  incidentDate DateTime  @db.Date
+  location     String?
+  status       String    @default("OPEN") // OPEN, INVESTIGATING, RESOLVED, CLOSED
+  resolution   String?
+  resolvedAt   DateTime?
+  resolvedById String?
+  photos       Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter   User    @relation("IncidentReporter", fields: [reportedById], references: [id])
+  resolver   User?   @relation("IncidentResolver", fields: [resolvedById], references: [id])
+
+  @@index([projectId])
+  @@index([status])
+  @@index([severity])
+  @@map("site_incidents")
+}
+
+model ProjectBudget {
+  id              String   @id @default(uuid())
+  projectId       String
+  category        String   // OVERALL, LABOR, MATERIALS, EQUIPMENT, TRANSPORTATION, FUEL, MAINTENANCE, UTILITIES, OTHER
+  allocatedAmount Decimal  @db.Decimal(15, 2)
+  revisedAmount   Decimal? @db.Decimal(15, 2)
+  revisionReason  String?
+  fiscalPeriod    String?  @default("2026")
+  status          String   @default("APPROVED") // DRAFT, PENDING_APPROVAL, APPROVED, REJECTED
+  approvedById    String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([category])
+  @@map("project_budgets")
+}
+
+model ProjectExpense {
+  id                  String    @id @default(uuid())
+  projectId           String
+  category            String    // LABOR, MATERIALS, EQUIPMENT, TRANSPORTATION, FUEL, MAINTENANCE, UTILITIES, OTHER
+  amount              Decimal   @db.Decimal(15, 2)
+  currency            String    @default("ETB")
+  description         String?
+  expenseDate         DateTime
+  recordedById        String?
+  referenceNumber     String?
+  payee               String?
+  supplierId          String?
+  paymentMethod       String?   @default("BANK_TRANSFER")
+  receiptUrl          String?
+  approvalStatus      String    @default("APPROVED") // DRAFT, SUBMITTED, APPROVED, REJECTED
+  approvedById        String?
+  approvedAt          DateTime?
+  paymentStatus       String    @default("PAID") // UNPAID, PAID, PARTIAL
+  attendanceSheetDate DateTime? @db.Date
+  invoiceId           String?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([category])
+  @@index([referenceNumber])
+  @@index([approvalStatus])
+  @@index([paymentStatus])
+  @@map("project_expenses")
+}
+
+model SupplierInvoice {
+  id              String   @id @default(uuid())
+  invoiceNumber   String   @unique
+  supplierId      String
+  projectId       String
+  purchaseOrderId String?
+  issueDate       DateTime @db.Date
+  dueDate         DateTime @db.Date
+  subtotal        Decimal  @db.Decimal(15, 2)
+  taxAmount       Decimal  @default(0.00) @db.Decimal(15, 2)
+  totalAmount     Decimal  @db.Decimal(15, 2)
+  paidAmount      Decimal  @default(0.00) @db.Decimal(15, 2)
+  balanceDue      Decimal  @db.Decimal(15, 2)
+  currency        String   @default("ETB")
+  status          String   @default("PENDING_APPROVAL") // DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, PAID, PARTIALLY_PAID, OVERDUE
+  paymentTerms    String?
+  notes           String?
+  attachmentUrl   String?
+  createdById     String?
+  approvedById    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([projectId])
+  @@index([status])
+  @@map("supplier_invoices")
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  paymentNumber   String   @unique
+  invoiceId       String?
+  expenseId       String?
+  projectId       String
+  supplierId      String?
+  amount          Decimal  @db.Decimal(15, 2)
+  currency        String   @default("ETB")
+  paymentDate     DateTime @db.Date
+  paymentMethod   String   @default("BANK_TRANSFER")
+  referenceNumber String?
+  receiptUrl      String?
+  status          String   @default("COMPLETED") // PENDING, COMPLETED, REVERSED
+  notes           String?
+  recordedById    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([invoiceId])
+  @@index([supplierId])
+  @@map("payments")
+}
+
+model AiPrediction {
+  id                  String   @id @default(uuid())
+  projectId           String
+  predictionType      String   // COST_FORECAST, DELAY_RISK, WORKFORCE_UTILIZATION, LABOR_COST_TREND, MATERIAL_DEMAND, SPENDING_ANOMALY
+  predictionDate      DateTime @default(now())
+  result              Json
+  confidenceScore     Float?
+  dataPeriod          String?
+  modelVersion        String?  @default("v1.0-statistical-regression")
+  contributingFactors Json?
+  recommendedActions  Json?
+  limitations         Json?
+  createdAt           DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([predictionType])
+  @@map("ai_predictions")
+model attendances {
+  id               String    @id @default(uuid())
+  employeeId       String
+  projectId        String?
+  date             DateTime  @db.Date
+  status           String    @default("PRESENT")
+  overtimeHours    Decimal   @default(0.00) @db.Decimal(4, 2)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now())
+  checkInTime      String?
+  checkOutTime     String?
+  workHours        Decimal?  @default(8.00) @db.Decimal(4, 2)
+  approvalStatus   String    @default("APPROVED")
+  recordedById     String?
+  reviewedById     String?
+  correctionReason String?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+
+  employees        employees @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project          Project?  @relation(fields: [projectId], references: [id])
+  recordedBy       User?     @relation("RecordedAttendances", fields: [recordedById], references: [id])
+
+  @@unique([employeeId, date])
+  @@index([date])
+  @@index([projectId])
+  @@index([recordedById])
+}
+
+model employees {
+  id                String           @id
+  employeeCode      String           @unique
+  fullName          String
+  phone             String
+  email             String?
+  trade             String
+  employmentType    String           @default("DAILY_LABORER")
+  dailyRate         Decimal?         @db.Decimal(10, 2)
+  monthlySalary     Decimal?         @db.Decimal(10, 2)
+  currency          String           @default("ETB")
+  status            String           @default("ACTIVE")
+  nationalId        String?
+  assignedProjectId String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @default(now())
+  attendances       attendances[]
+  projects          Project?         @relation(fields: [assignedProjectId], references: [id])
+  leave_requests    leave_requests[]
+
+  @@index([assignedProjectId])
+  @@index([status])
+  @@index([trade])
+}
+
+model leave_requests {
+  id           String    @id
+  employeeId   String
+  leaveType    String
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  status       String    @default("PENDING")
+  reviewerNote String?
+  reviewedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now())
+  employees    employees @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model material_categories {
+  id          String      @id
+  name        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  materials   materials[]
+}
+
+model materials {
+  id                  String              @id
+  code                String              @unique
+  name                String
+  categoryId          String
+  unit                String
+  reorderLevel        Decimal             @db.Decimal(10, 2)
+  currentStock        Decimal             @default(0) @db.Decimal(10, 2)
+  description         String?
+  isActive            Boolean             @default(true)
+  createdById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime
+  material_categories material_categories @relation(fields: [categoryId], references: [id])
+  users               User?               @relation(fields: [createdById], references: [id])
+  stock_movements     stock_movements[]
+
+  @@index([categoryId])
+  @@index([createdById])
+  @@index([isActive])
+}
+
+model notifications {
+  id              String   @id
+  recipientRole   String?
+  recipientUserId String?
+  title           String
+  message         String
+  type            String?
+  category        String?
+  link            String?
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+}
+
+model stock_movements {
+  id           String       @id
+  materialId   String
+  movementType MovementType
+  quantity     Decimal      @db.Decimal(10, 2)
+  reference    String?
+  notes        String?
+  createdById  String?
+  createdAt    DateTime     @default(now())
+  users        User?        @relation(fields: [createdById], references: [id])
+  materials    materials    @relation(fields: [materialId], references: [id])
+
+  @@index([createdAt])
+  @@index([materialId])
+  @@index([movementType])
+}
+
+model suppliers {
+  id            String   @id
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  taxId         String?
+  paymentTerms  String?
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  city          String?
+  code          String?  @unique
+  country       String?
+  website       String?
+  users         User?    @relation(fields: [createdById], references: [id])
+
+  @@index([code])
+  @@index([createdById])
+  @@index([isActive])
+}
+
 enum ProjectStatus {
   PLANNED
   IN_PROGRESS
   ON_HOLD
   COMPLETED
   CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum RequestUrgency {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+enum MovementType {
+  RECEIPT
+  ISSUANCE
+  ADJUSTMENT
+}
+
+enum MilestoneStatus {
+  UPCOMING
+  IN_PROGRESS
+  BEHIND_SCHEDULE
+  COMPLETED
+}
+
+enum ReportReviewStatus {
+  PENDING_REVIEW
+  REVIEWED
+  FLAGGED
+}
+
+enum MaterialRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+model Task {
+  id              String      @id @default(uuid())
+  projectId       String
+  taskName        String
+  description     String?
+  priority        String      @default("MEDIUM")
+  status          TaskStatus  @default(PENDING)
+  progressPercent Int         @default(0)
+}
+
+enum RequestUrgency {
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+
+model Task {
+  id              String        @id @default(uuid())
+  projectId       String
+  milestoneId     String?
+  assignedToId    String?
+  taskName        String
+  description     String?
+  priority        TaskPriority  @default(MEDIUM)
+  status          TaskStatus    @default(PENDING)
+  progressPercent Int           @default(0)
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  completionNotes String?
+  issues          String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone       Milestone?           @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  assignedTo      User?                @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  activities      DailySiteActivity[]
+
+  @@index([projectId])
+  @@index([milestoneId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+model MaterialCategory {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  materials   Material[]
+
+  @@map("material_categories")
+}
+
+model Material {
+  id           String            @id @default(uuid())
+  code         String            @unique
+  name         String
+  unit         String
+  reorderLevel Decimal           @default(0.00) @db.Decimal(10, 2)
+  currentStock Decimal           @default(0.00) @db.Decimal(10, 2)
+  description  String?
+  isActive     Boolean           @default(true)
+  categoryId   String?
+  category     MaterialCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([categoryId])
+  @@map("materials")
+}
+
+model MaterialRequest {
+  id                 String                @id @default(uuid())
+  requestNumber      String                @unique
+  projectId          String
+  requestedById      String
+  requestedMaterials String
+  totalEstimatedCost Decimal?              @db.Decimal(15, 2)
+  urgency            RequestUrgency        @default(NORMAL)
+  status             MaterialRequestStatus @default(PENDING)
+  justification      String?
+  deliveryLocation   String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requester   User                  @relation("MaterialRequester", fields: [requestedById], references: [id])
+  items       MaterialRequestItem[]
+
+  @@index([projectId])
+  @@index([requestedById])
+  @@index([status])
+  @@map("material_requests")
+}
+
+model MaterialRequestItem {
+  id                String          @id @default(uuid())
+  materialRequestId String
+  itemName          String
+  quantity          Decimal         @default(1.00) @db.Decimal(10, 2)
+  unit              String          @default("PCS")
+  createdAt         DateTime        @default(now())
+
+  materialRequest MaterialRequest @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
+
+  @@index([materialRequestId])
+  @@map("material_request_items")
+}
+
+model DailySiteActivity {
+  id                  String    @id @default(uuid())
+  projectId           String
+  siteEngineerId      String?
+  activityDate        DateTime  @db.Date
+  activityDescription String
+  workCompleted       String
+  laborCount          Int       @default(0)
+  materialsUsed       String?
+  issues              String?
+  weatherConditions   String?   @default("Clear")
+  safetyObservations String?   @default("Normal operations, PPE observed")
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([activityDate])
+  @@map("daily_site_activities")
+}
+model DailySiteActivity {
+  id                  String   @id @default(uuid())
+  projectId           String
+  siteEngineerId      String
+  taskId              String?
+  activityDate        DateTime @db.Date
+  activityDescription String
+  workCompleted       String
+  laborCount          Int?
+  materialsUsed       String?
+  issues              String?
+  weatherConditions   String?
+  safetyObservations  String?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteEngineer        User     @relation("EngineerActivities", fields: [siteEngineerId], references: [id])
+  task                Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([siteEngineerId])
+  @@index([activityDate])
+  @@map("daily_site_activities")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }

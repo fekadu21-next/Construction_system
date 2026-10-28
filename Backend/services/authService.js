@@ -182,6 +182,24 @@ export const authService = {
     const newRefreshTokenHash = hashToken(newRefreshToken);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+    await prisma.$transaction(async (tx) => {
+      const newSession = await tx.refreshSession.create({
+        data: {
+          userId: session.user.id,
+          tokenHash: newRefreshTokenHash,
+          expiresAt,
+          userAgent,
+          ipAddress,
+        },
+      });
+
+      await tx.refreshSession.update({
+        where: { id: session.id },
+        data: {
+          revokedAt: new Date(),
+          replacedBySessionId: newSession.id,
+        },
+      });
     const newSession = await prisma.refreshSession.create({
       data: {
         userId: session.user.id,

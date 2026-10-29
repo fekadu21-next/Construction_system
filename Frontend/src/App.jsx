@@ -7,12 +7,6 @@ import LoginPage from "./pages/LoginPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
-// Dashboards
-import ProjectManagerDashboard from "./pages/ProjectManagerDashboard.jsx";
-import SiteEngineerDashboard from "./pages/SiteEngineerDashboard.jsx";
-import AccountantDashboard from "./pages/AccountantDashboard.jsx";
-import HRManagerDashboard from "./pages/HRManagerDashboard.jsx";
-import ProcurementDashboard from "./pages/ProcurementDashboard.jsx";
 
 // General Manager
 import GeneralManagerLayout from "./layouts/GeneralManagerLayout.jsx";
@@ -198,12 +192,6 @@ function AppRoutes() {
         <Route path="profile" element={<AccountantProfilePage />} />
       </Route>
 
-      {/* Direct Role Dashboard Routes */}
-      <Route path="/project-manager/dashboard" element={<ProjectManagerDashboard />} />
-      <Route path="/site-engineer/dashboard" element={<SiteEngineerDashboard />} />
-      <Route path="/accountant/dashboard" element={<AccountantDashboard />} />
-      <Route path="/hr/dashboard" element={<HRManagerDashboard />} />
-      <Route path="/procurement/dashboard" element={<ProcurementDashboard />} />
 
       {/* Project Manager Suite */}
       <Route
@@ -253,8 +241,15 @@ function AppRoutes() {
         <Route path="profile" element={<SEProfilePage />} />
       </Route>
 
-  {/* Procurement Officer & Storekeeper Routes */ }
-      <Route path="/procurement" element={<ProcurementLayout />}>
+      {/* Procurement Officer & Storekeeper Routes */}
+      <Route
+        path="/procurement"
+        element={
+          <RoleProtectedRoute allowedRoles={[USER_ROLES.PROCUREMENT_OFFICER, USER_ROLES.GENERAL_MANAGER]}>
+            <ProcurementLayout />
+          </RoleProtectedRoute>
+        }
+      >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<ProcurementDashboardPage />} />
         <Route path="inventory" element={<ProcurementInventoryPage />} />

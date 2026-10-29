@@ -202,22 +202,6 @@ export const authService = {
           replacedBySessionId: newSession.id,
         },
       });
-    const newSession = await prisma.refreshSession.create({
-      data: {
-        userId: session.user.id,
-        tokenHash: newRefreshTokenHash,
-        expiresAt,
-        userAgent,
-        ipAddress,
-      },
-    });
-
-    await prisma.refreshSession.update({
-      where: { id: session.id },
-      data: {
-        revokedAt: new Date(),
-        replacedBySessionId: newSession.id,
-      },
     });
 
     return {

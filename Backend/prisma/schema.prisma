@@ -32,61 +32,40 @@ model User {
   emailVerificationExpiresAt DateTime?
   mustChangePassword         Boolean   @default(false)
   profilePhotoUrl            String?
+  preferences                Json?
   createdById                String?
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
-  role                 Role              @relation(fields: [roleId], references: [id])
+  role                 Role                 @relation(fields: [roleId], references: [id])
   refreshSessions      RefreshSession[]
   passwordResetTokens  PasswordResetToken[]
-  createdBy            User?             @relation("UserCreator", fields: [createdById], references: [id])
-  createdUsers         User[]            @relation("UserCreator")
-  managedProjects      Project[]         @relation("ProjectManager")
-  supervisedProjects   Project[]         @relation("ProjectSupervisor")
-  createdProjects      Project[]         @relation("ProjectCreator")
+  createdBy            User?                @relation("UserCreator", fields: [createdById], references: [id])
+  createdUsers         User[]               @relation("UserCreator")
+  managedProjects      Project[]            @relation("ProjectManager")
+  supervisedProjects   Project[]            @relation("ProjectSupervisor")
+  siteEngineerProjects Project[]            @relation("ProjectSiteEngineer")
+  createdProjects      Project[]            @relation("ProjectCreator")
   auditLogs            AuditLog[]
-  reportedIncidents    SiteIncident[]    @relation("IncidentReporter")
-  resolvedIncidents    SiteIncident[]    @relation("IncidentResolver")
-  materialRequests     MaterialRequest[] @relation("MaterialRequester")
-  id                         String               @id @default(uuid())
-  fullName                   String
-  email                      String               @unique
-  passwordHash               String
-  roleId                     String
-  isActive                   Boolean              @default(true)
-  emailVerifiedAt            DateTime?
-  emailVerificationToken     String?
-  emailVerificationExpiresAt DateTime?
-  createdAt                  DateTime             @default(now())
-  updatedAt                  DateTime             @updatedAt
-  createdById                String?
-  mustChangePassword         Boolean              @default(false)
-  profilePhotoUrl            String?
-  phone                      String?
-  preferences                Json?
-  auditLogs                  AuditLog[]
-  materials                  materials[]
-  passwordResetTokens        PasswordResetToken[]
-  createdProjects            Project[]            @relation("ProjectCreator")
-  managedProjects            Project[]            @relation("ProjectManager")
-  refreshSessions            RefreshSession[]
-  stock_movements            stock_movements[]
-  suppliers                  suppliers[]
-  createdBy                  User?                @relation("UserCreator", fields: [createdById], references: [id])
-  createdUsers               User[]               @relation("UserCreator")
-  role                       Role                 @relation(fields: [roleId], references: [id])
+  reportedIncidents    SiteIncident[]       @relation("IncidentReporter")
+  resolvedIncidents    SiteIncident[]       @relation("IncidentResolver")
 
   // Project Manager & Site Engineer relations
-  assignedMilestones   Milestone[]         @relation("EngineerMilestones")
-  submittedReports     ProgressReport[]    @relation("EngineerReports")
-  reviewedReports      ProgressReport[]    @relation("PMReviewedReports")
-  requestedMaterials   MaterialRequest[]   @relation("RequestedMaterials")
-  reviewedMaterials    MaterialRequest[]   @relation("ReviewedMaterials")
-  recordedExpenses     ProjectExpense[]    @relation("RecordedExpenses")
-  siteEngineerProjects Project[]           @relation("ProjectSiteEngineer")
-  assignedTasks        Task[]              @relation("AssignedTasks")
-  siteActivities       DailySiteActivity[] @relation("EngineerActivities")
-  recordedAttendances  attendances[]       @relation("RecordedAttendances")
+  assignedMilestones   Milestone[]          @relation("EngineerMilestones")
+  submittedReports     ProgressReport[]     @relation("EngineerReports")
+  reviewedReports      ProgressReport[]     @relation("PMReviewedReports")
+  requestedMaterials   MaterialRequest[]    @relation("RequestedMaterials")
+  reviewedMaterials    MaterialRequest[]    @relation("ReviewedMaterials")
+  recordedExpenses     ProjectExpense[]     @relation("RecordedExpenses")
+  assignedTasks        Task[]               @relation("AssignedTasks")
+  siteActivities       DailySiteActivity[]  @relation("EngineerActivities")
+  recordedAttendances  Attendance[]         @relation("RecordedAttendances")
+
+  // Procurement relations
+  createdMaterials      Material[]      @relation("MaterialCreator")
+  createdSuppliers      Supplier[]      @relation("SupplierCreator")
+  createdStockMovements StockMovement[] @relation("StockMovementCreator")
+  createdEquipment      Equipment[]     @relation("EquipmentCreator")
 
   @@index([roleId])
   @@index([isActive])
@@ -110,9 +89,6 @@ model RefreshSession {
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   replacedBy RefreshSession? @relation("SessionReplacement", fields: [replacedBySessionId], references: [id])
   replaces   RefreshSession? @relation("SessionReplacement")
-  replacedBy          RefreshSession? @relation("SessionReplacement", fields: [replacedBySessionId], references: [id])
-  replaces            RefreshSession? @relation("SessionReplacement")
-  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
@@ -129,7 +105,6 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
@@ -158,6 +133,7 @@ model Project {
 
   projectManager   User?         @relation("ProjectManager", fields: [projectManagerId], references: [id])
   supervisor       User?         @relation("ProjectSupervisor", fields: [supervisorId], references: [id])
+  siteEngineer     User?         @relation("ProjectSiteEngineer", fields: [siteEngineerId], references: [id])
   createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
 
   employees        Employee[]
@@ -170,34 +146,13 @@ model Project {
   payments         Payment[]
   aiPredictions    AiPrediction[]
   tasks            Task[]
+  dailyActivities  DailySiteActivity[]
+  milestones       Milestone[]
+  progressReports  ProgressReport[]
   materialRequests MaterialRequest[]
-  activities       DailySiteActivity[]
 
   @@index([projectManagerId])
   @@index([supervisorId])
-  status           ProjectStatus @default(PLANNED)
-  projectManagerId String?
-  siteEngineerId   String?
-  createdById      String
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  currency         String        @default("ETB")
-  archivedAt       DateTime?
-  employees        employees[]
-  createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
-  projectManager   User?         @relation("ProjectManager", fields: [projectManagerId], references: [id])
-  siteEngineer     User?         @relation("ProjectSiteEngineer", fields: [siteEngineerId], references: [id])
-
-  // Operational relations
-  milestones       Milestone[]
-  tasks            Task[]
-  dailyActivities  DailySiteActivity[]
-  progressReports  ProgressReport[]
-  materialRequests MaterialRequest[]
-  expenses         ProjectExpense[]
-  attendances      attendances[]
-
-  @@index([projectManagerId])
   @@index([siteEngineerId])
   @@index([createdById])
   @@index([status])
@@ -283,13 +238,15 @@ model Attendance {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  recordedBy User?    @relation("RecordedAttendances", fields: [recordedById], references: [id])
 
   @@unique([employeeId, date])
   @@index([projectId])
   @@index([date])
   @@index([approvalStatus])
+  @@index([recordedById])
   @@map("attendances")
 }
 
@@ -303,13 +260,16 @@ model LeaveRequest {
   status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
   reviewerNote String?
   reviewedById String?
-  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([status])
   @@map("leave_requests")
+}
+
 model Milestone {
   id                 String          @id @default(uuid())
   projectId          String
@@ -331,6 +291,64 @@ model Milestone {
   @@index([dueDate])
   @@index([status])
   @@map("milestones")
+}
+
+model Task {
+  id              String        @id @default(uuid())
+  projectId       String
+  milestoneId     String?
+  assignedToId    String?
+  createdById     String?
+  taskName        String
+  description     String?
+  priority        TaskPriority  @default(MEDIUM)
+  status          TaskStatus    @default(PENDING)
+  progressPercent Int           @default(0)
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  completionNotes String?
+  issues          String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  project    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone  Milestone?          @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  assignedTo User?               @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  activities DailySiteActivity[]
+
+  @@index([projectId])
+  @@index([milestoneId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+model DailySiteActivity {
+  id                  String   @id @default(uuid())
+  projectId           String
+  siteEngineerId      String
+  taskId              String?
+  activityDate        DateTime @db.Date
+  activityDescription String
+  workCompleted       String
+  laborCount          Int?
+  materialsUsed       String?
+  issues              String?
+  weatherConditions   String?  @default("Clear")
+  safetyObservations  String?  @default("Normal operations, PPE observed")
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteEngineer User    @relation("EngineerActivities", fields: [siteEngineerId], references: [id])
+  task         Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([siteEngineerId])
+  @@index([activityDate])
+  @@map("daily_site_activities")
 }
 
 model ProgressReport {
@@ -394,8 +412,8 @@ model MaterialRequestItem {
   id                String   @id @default(uuid())
   materialRequestId String
   itemName          String
-  quantity          Decimal  @db.Decimal(12, 2)
-  unit              String
+  quantity          Decimal  @default(1.00) @db.Decimal(12, 2)
+  unit              String   @default("PCS")
   estimatedUnitCost Decimal? @db.Decimal(15, 2)
   createdAt         DateTime @default(now())
 
@@ -405,44 +423,141 @@ model MaterialRequestItem {
   @@map("material_request_items")
 }
 
-model ProjectExpense {
+model MaterialCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  materials Material[]
+
+  @@map("material_categories")
+}
+
+model Material {
   id           String   @id @default(uuid())
-  projectId    String
-  category     String
-  amount       Decimal  @db.Decimal(15, 2)
-  currency     String   @default("ETB")
+  code         String   @unique
+  name         String
+  categoryId   String
+  unit         String
+  reorderLevel Decimal  @db.Decimal(10, 2)
+  currentStock Decimal  @default(0) @db.Decimal(10, 2)
   description  String?
-  expenseDate  DateTime
-  recordedById String?
+  isActive     Boolean  @default(true)
+  createdById  String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  recordedBy User?   @relation("RecordedExpenses", fields: [recordedById], references: [id])
+  category       MaterialCategory @relation(fields: [categoryId], references: [id])
+  createdBy      User?            @relation("MaterialCreator", fields: [createdById], references: [id])
+  stockMovements StockMovement[]
 
-  @@index([projectId])
-  @@index([category])
-  @@index([expenseDate])
-  @@map("project_expenses")
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([createdById])
+  @@map("materials")
 }
 
-model AuditLog {
-  id          String   @id @default(uuid())
-  actorUserId String?
-  action      String
-  entityType  String
-  entityId    String?
-  details     Json?
-  createdAt   DateTime @default(now())
+model StockMovement {
+  id           String       @id @default(uuid())
+  materialId   String
+  movementType MovementType
+  quantity     Decimal      @db.Decimal(10, 2)
+  reference    String?
+  notes        String?
+  createdById  String?
+  createdAt    DateTime     @default(now())
 
-  actor User? @relation(fields: [actorUserId], references: [id])
-  actor       User?    @relation(fields: [actorUserId], references: [id])
+  material  Material @relation(fields: [materialId], references: [id])
+  createdBy User?    @relation("StockMovementCreator", fields: [createdById], references: [id])
 
-  @@index([actorUserId])
-  @@index([entityType])
-  @@index([entityId])
+  @@index([materialId])
+  @@index([movementType])
   @@index([createdAt])
-  @@map("audit_logs")
+  @@map("stock_movements")
+}
+
+model Supplier {
+  id            String   @id @default(uuid())
+  code          String?  @unique
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  country       String?
+  website       String?
+  taxId         String?
+  paymentTerms  String?
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdBy User?       @relation("SupplierCreator", fields: [createdById], references: [id])
+  equipment Equipment[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([createdById])
+  @@map("suppliers")
+}
+
+model Equipment {
+  id                    String             @id @default(uuid())
+  code                  String             @unique
+  name                  String
+  model                 String?
+  category              EquipmentCategory  @default(EARTHMOVING)
+  ownership             EquipmentOwnership @default(RENTED)
+
+  // Supplier link (optional FK to Supplier)
+  supplierId            String?
+  supplierName          String?
+  supplierContact       String?
+  supplier              Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  // Rental agreement details
+  rentalRateDailyETB    Decimal            @default(0) @db.Decimal(12, 2)
+  internalCostPerDayETB Decimal            @default(0) @db.Decimal(12, 2)
+  rentalStartDate       DateTime?
+  rentalEndDate         DateTime?
+  agreementRef          String?
+
+  // Project assignment (soft reference)
+  projectId             String?
+  projectName           String?
+
+  // Operational state
+  status                EquipmentStatus    @default(AVAILABLE)
+  serialOrPlate         String?
+  currentHourMeter      Decimal            @default(0) @db.Decimal(10, 2)
+  nextServiceHours      Decimal?           @db.Decimal(10, 2)
+  fuelRateType          FuelRateType       @default(DRY_RATE)
+  condition             EquipmentCondition @default(GOOD)
+  notes                 String?
+
+  // Off-hire return tracking
+  returnedAt            DateTime?
+  finalHourMeter        Decimal?           @db.Decimal(10, 2)
+  offHireCertificateRef String?
+  returnInspectionNotes String?
+
+  createdById           String?
+  createdBy             User?              @relation("EquipmentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([ownership])
+  @@index([category])
+  @@index([projectId])
+  @@index([createdById])
+  @@map("equipment")
 }
 
 model Notification {
@@ -482,9 +597,9 @@ model SiteIncident {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  reporter   User    @relation("IncidentReporter", fields: [reportedById], references: [id])
-  resolver   User?   @relation("IncidentResolver", fields: [resolvedById], references: [id])
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter User    @relation("IncidentReporter", fields: [reportedById], references: [id])
+  resolver User?   @relation("IncidentResolver", fields: [resolvedById], references: [id])
 
   @@index([projectId])
   @@index([status])
@@ -537,7 +652,8 @@ model ProjectExpense {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recordedBy User?   @relation("RecordedExpenses", fields: [recordedById], references: [id])
 
   @@index([projectId])
   @@index([category])
@@ -624,164 +740,24 @@ model AiPrediction {
   @@index([projectId])
   @@index([predictionType])
   @@map("ai_predictions")
-model attendances {
-  id               String    @id @default(uuid())
-  employeeId       String
-  projectId        String?
-  date             DateTime  @db.Date
-  status           String    @default("PRESENT")
-  overtimeHours    Decimal   @default(0.00) @db.Decimal(4, 2)
-  notes            String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @default(now())
-  checkInTime      String?
-  checkOutTime     String?
-  workHours        Decimal?  @default(8.00) @db.Decimal(4, 2)
-  approvalStatus   String    @default("APPROVED")
-  recordedById     String?
-  reviewedById     String?
-  correctionReason String?
-  submittedAt      DateTime?
-  reviewedAt       DateTime?
-
-  employees        employees @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  project          Project?  @relation(fields: [projectId], references: [id])
-  recordedBy       User?     @relation("RecordedAttendances", fields: [recordedById], references: [id])
-
-  @@unique([employeeId, date])
-  @@index([date])
-  @@index([projectId])
-  @@index([recordedById])
 }
 
-model employees {
-  id                String           @id
-  employeeCode      String           @unique
-  fullName          String
-  phone             String
-  email             String?
-  trade             String
-  employmentType    String           @default("DAILY_LABORER")
-  dailyRate         Decimal?         @db.Decimal(10, 2)
-  monthlySalary     Decimal?         @db.Decimal(10, 2)
-  currency          String           @default("ETB")
-  status            String           @default("ACTIVE")
-  nationalId        String?
-  assignedProjectId String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @default(now())
-  attendances       attendances[]
-  projects          Project?         @relation(fields: [assignedProjectId], references: [id])
-  leave_requests    leave_requests[]
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  details     Json?
+  createdAt   DateTime @default(now())
 
-  @@index([assignedProjectId])
-  @@index([status])
-  @@index([trade])
-}
+  actor User? @relation(fields: [actorUserId], references: [id])
 
-model leave_requests {
-  id           String    @id
-  employeeId   String
-  leaveType    String
-  startDate    DateTime
-  endDate      DateTime
-  reason       String?
-  status       String    @default("PENDING")
-  reviewerNote String?
-  reviewedById String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @default(now())
-  employees    employees @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([employeeId])
-  @@index([status])
-}
-
-model material_categories {
-  id          String      @id
-  name        String      @unique
-  description String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime
-  materials   materials[]
-}
-
-model materials {
-  id                  String              @id
-  code                String              @unique
-  name                String
-  categoryId          String
-  unit                String
-  reorderLevel        Decimal             @db.Decimal(10, 2)
-  currentStock        Decimal             @default(0) @db.Decimal(10, 2)
-  description         String?
-  isActive            Boolean             @default(true)
-  createdById         String?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime
-  material_categories material_categories @relation(fields: [categoryId], references: [id])
-  users               User?               @relation(fields: [createdById], references: [id])
-  stock_movements     stock_movements[]
-
-  @@index([categoryId])
-  @@index([createdById])
-  @@index([isActive])
-}
-
-model notifications {
-  id              String   @id
-  recipientRole   String?
-  recipientUserId String?
-  title           String
-  message         String
-  type            String?
-  category        String?
-  link            String?
-  isRead          Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
-}
-
-model stock_movements {
-  id           String       @id
-  materialId   String
-  movementType MovementType
-  quantity     Decimal      @db.Decimal(10, 2)
-  reference    String?
-  notes        String?
-  createdById  String?
-  createdAt    DateTime     @default(now())
-  users        User?        @relation(fields: [createdById], references: [id])
-  materials    materials    @relation(fields: [materialId], references: [id])
-
+  @@index([actorUserId])
+  @@index([entityType])
+  @@index([entityId])
   @@index([createdAt])
-  @@index([materialId])
-  @@index([movementType])
-}
-
-model suppliers {
-  id            String   @id
-  name          String
-  contactPerson String?
-  email         String?
-  phone         String?
-  address       String?
-  taxId         String?
-  paymentTerms  String?
-  notes         String?
-  isActive      Boolean  @default(true)
-  createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime
-  city          String?
-  code          String?  @unique
-  country       String?
-  website       String?
-  users         User?    @relation(fields: [createdById], references: [id])
-
-  @@index([code])
-  @@index([createdById])
-  @@index([isActive])
+  @@map("audit_logs")
 }
 
 enum ProjectStatus {
@@ -799,15 +775,11 @@ enum TaskStatus {
   BLOCKED
 }
 
-enum RequestUrgency {
+enum TaskPriority {
   LOW
-  NORMAL
+  MEDIUM
   HIGH
-  CRITICAL
-enum MovementType {
-  RECEIPT
-  ISSUANCE
-  ADJUSTMENT
+  URGENT
 }
 
 enum MilestoneStatus {
@@ -823,6 +795,13 @@ enum ReportReviewStatus {
   FLAGGED
 }
 
+enum RequestUrgency {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
 enum MaterialRequestStatus {
   PENDING
   APPROVED
@@ -830,186 +809,42 @@ enum MaterialRequestStatus {
   FULFILLED
 }
 
-model Task {
-  id              String      @id @default(uuid())
-  projectId       String
-  taskName        String
-  description     String?
-  priority        String      @default("MEDIUM")
-  status          TaskStatus  @default(PENDING)
-  progressPercent Int         @default(0)
+enum MovementType {
+  RECEIPT
+  ISSUANCE
+  ADJUSTMENT
 }
 
-enum RequestUrgency {
-  NORMAL
-  HIGH
-  CRITICAL
+enum EquipmentCategory {
+  EARTHMOVING
+  CONCRETE
+  LIFTING
+  HAULAGE_TRANSPORT
+  POWER_ENERGY
 }
 
-
-model Task {
-  id              String        @id @default(uuid())
-  projectId       String
-  milestoneId     String?
-  assignedToId    String?
-  taskName        String
-  description     String?
-  priority        TaskPriority  @default(MEDIUM)
-  status          TaskStatus    @default(PENDING)
-  progressPercent Int           @default(0)
-  startDate       DateTime?
-  dueDate         DateTime?
-  completedAt     DateTime?
-  completionNotes String?
-  issues          String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  createdById     String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  milestone       Milestone?           @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
-  assignedTo      User?                @relation("AssignedTasks", fields: [assignedToId], references: [id])
-  activities      DailySiteActivity[]
-
-  @@index([projectId])
-  @@index([milestoneId])
-  @@index([assignedToId])
-  @@index([status])
-  @@map("tasks")
+enum EquipmentOwnership {
+  RENTED
+  COMPANY_OWNED
 }
 
-model MaterialCategory {
-  id          String     @id @default(uuid())
-  name        String     @unique
-  description String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  materials   Material[]
-
-  @@map("material_categories")
+enum EquipmentStatus {
+  ON_SITE
+  AVAILABLE
+  STANDBY
+  MAINTENANCE
+  RETURNED
 }
 
-model Material {
-  id           String            @id @default(uuid())
-  code         String            @unique
-  name         String
-  unit         String
-  reorderLevel Decimal           @default(0.00) @db.Decimal(10, 2)
-  currentStock Decimal           @default(0.00) @db.Decimal(10, 2)
-  description  String?
-  isActive     Boolean           @default(true)
-  categoryId   String?
-  category     MaterialCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-
-  @@index([categoryId])
-  @@map("materials")
+enum FuelRateType {
+  DRY_RATE
+  WET_RATE
+  N_A
 }
 
-model MaterialRequest {
-  id                 String                @id @default(uuid())
-  requestNumber      String                @unique
-  projectId          String
-  requestedById      String
-  requestedMaterials String
-  totalEstimatedCost Decimal?              @db.Decimal(15, 2)
-  urgency            RequestUrgency        @default(NORMAL)
-  status             MaterialRequestStatus @default(PENDING)
-  justification      String?
-  deliveryLocation   String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-
-  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  requester   User                  @relation("MaterialRequester", fields: [requestedById], references: [id])
-  items       MaterialRequestItem[]
-
-  @@index([projectId])
-  @@index([requestedById])
-  @@index([status])
-  @@map("material_requests")
-}
-
-model MaterialRequestItem {
-  id                String          @id @default(uuid())
-  materialRequestId String
-  itemName          String
-  quantity          Decimal         @default(1.00) @db.Decimal(10, 2)
-  unit              String          @default("PCS")
-  createdAt         DateTime        @default(now())
-
-  materialRequest MaterialRequest @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
-
-  @@index([materialRequestId])
-  @@map("material_request_items")
-}
-
-model DailySiteActivity {
-  id                  String    @id @default(uuid())
-  projectId           String
-  siteEngineerId      String?
-  activityDate        DateTime  @db.Date
-  activityDescription String
-  workCompleted       String
-  laborCount          Int       @default(0)
-  materialsUsed       String?
-  issues              String?
-  weatherConditions   String?   @default("Clear")
-  safetyObservations String?   @default("Normal operations, PPE observed")
-  notes               String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([activityDate])
-  @@map("daily_site_activities")
-}
-model DailySiteActivity {
-  id                  String   @id @default(uuid())
-  projectId           String
-  siteEngineerId      String
-  taskId              String?
-  activityDate        DateTime @db.Date
-  activityDescription String
-  workCompleted       String
-  laborCount          Int?
-  materialsUsed       String?
-  issues              String?
-  weatherConditions   String?
-  safetyObservations  String?
-  notes               String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  siteEngineer        User     @relation("EngineerActivities", fields: [siteEngineerId], references: [id])
-  task                Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
-
-  @@index([projectId])
-  @@index([siteEngineerId])
-  @@index([activityDate])
-  @@map("daily_site_activities")
-}
-
-enum TaskStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  BLOCKED
-}
-
-enum TaskPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
+enum EquipmentCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
 }

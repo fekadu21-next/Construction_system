@@ -77,3 +77,5 @@ export const authorize = (...allowedRoles) => {
     next();
   };
 };
+
+export const authMiddleware = authenticate;

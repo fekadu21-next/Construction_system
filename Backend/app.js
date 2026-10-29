@@ -15,6 +15,12 @@ import aiRoutes from "./routes/aiRoutes.js";
 import preferencesRoutes from "./routes/preferencesRoutes.js";
 import projectManagerRoutes from "./routes/project-manager/projectManagerRoutes.js";
 import siteEngineerRoutes from "./routes/site-engineer/siteEngineerRoutes.js";
+import materialRoutes from "./routes/procurement/materialRoutes.js";
+import supplierRoutes from "./routes/procurement/supplierRoutes.js";
+import procurementDashboardRoutes from "./routes/procurement/dashboardRoutes.js";
+import equipmentRoutes from "./routes/procurement/equipmentRoutes.js";
+import { authenticate } from "./middlewares/authMiddleware.js";
+import prisma from "./config/prisma.js";
 
 const app = express();
 
@@ -111,6 +117,32 @@ app.use("/api/v1/site-engineer", siteEngineerRoutes);
 
 // User preferences routes
 app.use("/api/preferences", preferencesRoutes);
+
+// Procurement routes
+app.use("/api/procurement/materials", materialRoutes);
+app.use("/api/procurement/suppliers", supplierRoutes);
+app.use("/api/procurement/dashboard", procurementDashboardRoutes);
+app.use("/api/procurement/equipment", equipmentRoutes);
+
+// Shared project list endpoint (for dropdowns - accessible to any authenticated user)
+app.get("/api/shared/projects", authenticate, async (req, res) => {
+  try {
+    const projects = await prisma.project.findMany({
+      where: { status: { in: ["PLANNED", "IN_PROGRESS", "ON_HOLD"] } },
+      select: {
+        id: true,
+        projectName: true,
+        projectCode: true,
+        status: true,
+        location: true,
+      },
+      orderBy: { projectName: "asc" },
+    });
+    res.json({ success: true, data: projects });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to fetch projects" });
+  }
+});
 
 // Handle unknown routes
 app.use((req, res) => {

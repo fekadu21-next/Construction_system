@@ -7,7 +7,10 @@ export const preferencesController = {
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { preferences: true },
+        select: {
+          preferences: true,
+          role: { select: { name: true } },
+        },
       });
 
       if (!user) {
@@ -17,23 +20,45 @@ export const preferencesController = {
         });
       }
 
-      // Default preferences
+      const isProcurement = user.role?.name === "PROCUREMENT_OFFICER";
+
+      // Role-aware default preferences
       const defaultPreferences = {
         theme: "dark",
         language: "en",
         dateFormat: "DD/MM/YYYY",
         timeFormat: "12-hour",
         timeZone: "Africa/Addis_Ababa",
-        defaultPage: "/general-manager/dashboard",
-        notifications: {
-          email: true,
-          projectUpdates: true,
-          procurementUpdates: true,
-          financeAlerts: true,
-        },
+        defaultPage: isProcurement ? "/procurement/dashboard" : "/general-manager/dashboard",
+        notifications: isProcurement
+          ? {
+              email: true,
+              inAppAlerts: true,
+              lowStockMaterials: true,
+              outOfStockMaterials: true,
+              newApprovedMaterialRequests: true,
+              purchaseOrderApprovalsRejections: true,
+              upcomingOrOverdueDeliveries: true,
+              damagedOrMissingDeliveryItems: true,
+              deliveryReceivedOrPartiallyReceived: true,
+            }
+          : {
+              email: true,
+              projectUpdates: true,
+              procurementUpdates: true,
+              financeAlerts: true,
+            },
       };
 
-      const preferences = user.preferences || defaultPreferences;
+      const stored = (user.preferences && typeof user.preferences === "object") ? user.preferences : {};
+      const preferences = {
+        ...defaultPreferences,
+        ...stored,
+        notifications: {
+          ...defaultPreferences.notifications,
+          ...(stored.notifications || {}),
+        },
+      };
 
       res.json({
         success: true,

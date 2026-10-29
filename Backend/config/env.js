@@ -34,7 +34,15 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "15m",
   REFRESH_TOKEN_EXPIRES_IN: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",
-  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
+  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5174",
+  // Email / SMTP settings
+  SMTP_HOST: process.env.SMTP_HOST || process.env.EMAIL_HOST || "",
+  SMTP_PORT: Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || 587),
+  SMTP_SECURE: process.env.SMTP_SECURE === "true",
+  SMTP_USER: process.env.SMTP_USER || process.env.EMAIL_USER || "",
+  SMTP_PASS: process.env.SMTP_PASS || process.env.EMAIL_PASS || "",
+  EMAIL_SERVICE: process.env.EMAIL_SERVICE || "",
+  EMAIL_FROM: process.env.EMAIL_FROM || process.env.SMTP_FROM || "",
 };
 
 // Validate required configuration.

@@ -192,14 +192,13 @@ export const authController = {
 
       const result = await authService.forgotPassword(email);
 
-      if (result.token) {
-        console.log(`Password reset token for ${email}: ${result.token}`);
-        console.log(`Reset link: ${process.env.FRONTEND_URL}/reset-password?token=${result.token}`);
-      }
-
       res.json({
         success: true,
         message: result.message || "Password reset instructions have been sent to your email",
+        ...(process.env.NODE_ENV !== "production" && {
+          devResetUrl: result.resetUrl,
+          previewUrl: result.previewUrl,
+        }),
       });
     } catch (error) {
       if (error.message === "Email is not registered") {
@@ -212,6 +211,12 @@ export const authController = {
         return res.status(403).json({
           success: false,
           message: "Your account is inactive. Please contact an administrator.",
+        });
+      }
+      if (error.message && error.message.startsWith("Failed to send password reset email")) {
+        return res.status(500).json({
+          success: false,
+          message: error.message,
         });
       }
       console.error("Forgot password unexpected error:", error);

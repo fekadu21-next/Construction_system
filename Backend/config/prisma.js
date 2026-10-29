@@ -30,9 +30,35 @@ const prismaClientSingleton = () => {
   });
 };
 
-const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();
+const client = globalThis.prismaGlobal ?? prismaClientSingleton();
+
+// Provide compatibility aliases between singular and plural/snake_case model access
+const modelAliases = {
+  attendances: "attendance",
+  employees: "employee",
+  materials: "material",
+  suppliers: "supplier",
+  notifications: "notification",
+  leave_requests: "leaveRequest",
+  stock_movements: "stockMovement",
+  material_categories: "materialCategory",
+  daily_site_activities: "dailySiteActivity",
+};
+
+const prisma = new Proxy(client, {
+  get(target, prop, receiver) {
+    if (prop in target) {
+      return Reflect.get(target, prop, receiver);
+    }
+    const alias = modelAliases[prop];
+    if (alias && alias in target) {
+      return Reflect.get(target, alias, receiver);
+    }
+    return Reflect.get(target, prop, receiver);
+  },
+});
 
 export default prisma;
 
-if (process.env.NODE_ENV !== "production") globalThis.prismaGlobal = prisma;
+if (process.env.NODE_ENV !== "production") globalThis.prismaGlobal = client;
 

@@ -7,15 +7,16 @@ import LoginPage from "./pages/LoginPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
-
 // Dashboards
 import ProjectManagerDashboard from "./pages/ProjectManagerDashboard.jsx";
 import SiteEngineerDashboard from "./pages/SiteEngineerDashboard.jsx";
-import ProcurementDashboard from "./pages/ProcurementDashboard.jsx";
 import AccountantDashboard from "./pages/AccountantDashboard.jsx";
+import HRManagerDashboard from "./pages/HRManagerDashboard.jsx";
+import ProcurementDashboard from "./pages/ProcurementDashboard.jsx";
 
 // General Manager
 import GeneralManagerLayout from "./layouts/GeneralManagerLayout.jsx";
+import ProcurementLayout from "./layouts/procurement/ProcurementLayout.jsx";
 import DashboardPage from "./pages/general-manager/DashboardPage.jsx";
 import UsersPage from "./pages/general-manager/UsersPage.jsx";
 import ProjectsPage from "./pages/general-manager/ProjectsPage.jsx";
@@ -26,6 +27,18 @@ import ProfilePage from "./pages/general-manager/ProfilePage.jsx";
 
 // Auth & Roles
 import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute.jsx";
+import ProcurementDashboardPage from "./pages/procurement/DashboardPage.jsx";
+import ProcurementInventoryPage from "./pages/procurement/InventoryPage.jsx";
+import ProcurementEquipmentPage from "./pages/procurement/EquipmentPage.jsx";
+import ProcurementSuppliersPage from "./pages/procurement/SuppliersPage.jsx";
+import ProcurementProfilePage from "./pages/procurement/ProfilePage.jsx";
+import ProcurementSettingsPage from "./pages/procurement/SettingsPage.jsx";
+import ProcurementNotificationsPage from "./pages/procurement/NotificationsPage.jsx";
+import ProcurementMaterialIssuancePage from "./pages/procurement/MaterialIssuancePage.jsx";
+import ProcurementMaterialRequestsPage from "./pages/procurement/MaterialRequestsPage.jsx";
+import ProcurementPurchaseOrdersPage from "./pages/procurement/PurchaseOrdersPage.jsx";
+import ProcurementGoodsReceivingPage from "./pages/procurement/GoodsReceivingPage.jsx";
+import ProcurementReportsPage from "./pages/procurement/ReportsPage.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import { USER_ROLES, getDashboardRoute } from "./constants/roles.js";
 
@@ -88,9 +101,6 @@ import SEMaterialRequestsPage from "./pages/site-engineer/MaterialRequestsPage.j
 import SENotificationsPage from "./pages/site-engineer/NotificationsPage.jsx";
 import SEProfilePage from "./pages/site-engineer/ProfilePage.jsx";
 
-import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute.jsx";
-import { useAuth } from "./contexts/AuthContext.jsx";
-import { USER_ROLES, getDashboardRoute } from "./constants/roles.js";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -188,11 +198,22 @@ function AppRoutes() {
         <Route path="profile" element={<AccountantProfilePage />} />
       </Route>
 
-      {/* Other Role Dashboards */}
+      {/* Direct Role Dashboard Routes */}
       <Route path="/project-manager/dashboard" element={<ProjectManagerDashboard />} />
       <Route path="/site-engineer/dashboard" element={<SiteEngineerDashboard />} />
-      {/* Project Manager Routes */}
-      <Route path="/project-manager" element={<ProjectManagerLayout />}>
+      <Route path="/accountant/dashboard" element={<AccountantDashboard />} />
+      <Route path="/hr/dashboard" element={<HRManagerDashboard />} />
+      <Route path="/procurement/dashboard" element={<ProcurementDashboard />} />
+
+      {/* Project Manager Suite */}
+      <Route
+        path="/project-manager"
+        element={
+          <RoleProtectedRoute allowedRoles={[USER_ROLES.PROJECT_MANAGER, USER_ROLES.GENERAL_MANAGER]}>
+            <ProjectManagerLayout />
+          </RoleProtectedRoute>
+        }
+      >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<PMDashboardPage />} />
         <Route path="notifications" element={<PMNotificationsPage />} />
@@ -211,13 +232,11 @@ function AppRoutes() {
         <Route path="settings" element={<PMSettingsPage />} />
       </Route>
 
-      {/* Other Role Dashboards */}
-      <Route path="/hr/dashboard" element={<HRManagerDashboard />} />
-      {/* Site Engineer Routes */}
+      {/* Site Engineer Suite */}
       <Route
         path="/site-engineer"
         element={
-          <RoleProtectedRoute allowedRoles={[USER_ROLES.SITE_ENGINEER]}>
+          <RoleProtectedRoute allowedRoles={[USER_ROLES.SITE_ENGINEER, USER_ROLES.GENERAL_MANAGER]}>
             <SiteEngineerLayout />
           </RoleProtectedRoute>
         }
@@ -233,11 +252,32 @@ function AppRoutes() {
         <Route path="notifications" element={<SENotificationsPage />} />
         <Route path="profile" element={<SEProfilePage />} />
       </Route>
-      <Route path="/procurement/dashboard" element={<ProcurementDashboard />} />
+
+  {/* Procurement Officer & Storekeeper Routes */ }
+      <Route path="/procurement" element={<ProcurementLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<ProcurementDashboardPage />} />
+        <Route path="inventory" element={<ProcurementInventoryPage />} />
+        <Route path="equipment" element={<ProcurementEquipmentPage />} />
+        <Route path="equipment-rentals" element={<Navigate to="/procurement/equipment" replace />} />
+        <Route path="machinery" element={<Navigate to="/procurement/equipment" replace />} />
+        <Route path="suppliers" element={<ProcurementSuppliersPage />} />
+        <Route path="material-issuance" element={<ProcurementMaterialIssuancePage />} />
+        <Route path="material-requests" element={<ProcurementMaterialRequestsPage />} />
+        <Route path="procurement" element={<ProcurementPurchaseOrdersPage />} />
+        <Route path="purchase-orders" element={<Navigate to="/procurement/procurement" replace />} />
+        <Route path="goods-receiving" element={<ProcurementGoodsReceivingPage />} />
+        <Route path="reports" element={<ProcurementReportsPage />} />
+        <Route path="notifications" element={<ProcurementNotificationsPage />} />
+        <Route path="settings" element={<ProcurementSettingsPage />} />
+        <Route path="profile" element={<ProcurementProfilePage />} />
+        {/* Subroute fallback to prevent kicking user out to login */}
+        <Route path="*" element={<Navigate to="dashboard" replace />} />
+      </Route>
 
       <Route path="/" element={<Navigate to={user ? getDashboardRoute(user.role) || "/login" : "/login"} replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+    </Routes >
   );
 }
 

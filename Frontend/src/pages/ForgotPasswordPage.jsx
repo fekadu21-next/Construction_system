@@ -7,6 +7,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [devInfo, setDevInfo] = useState(null);
 
   const { forgotPassword } = useAuth();
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError("");
     setSuccess(false);
+    setDevInfo(null);
     setLoading(true);
 
     try {
@@ -22,6 +24,9 @@ export default function ForgotPasswordPage() {
 
       if (result.success) {
         setSuccess(true);
+        if (result.data) {
+          setDevInfo(result.data);
+        }
       } else {
         setError(result.error || "Email is not registered");
       }
@@ -201,6 +206,37 @@ export default function ForgotPasswordPage() {
                       link has been sent. Check your email for instructions.
                     </p>
                   </div>
+
+                  {devInfo?.devResetUrl && (
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50/80 p-4 text-xs text-blue-900 shadow-sm">
+                      <div className="mb-1.5 flex items-center gap-2 font-semibold text-blue-950">
+                        <span className="inline-block h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+                        <span>Development Reset Link:</span>
+                      </div>
+                      <p className="mb-2 text-slate-600">
+                        You can click the link below to test resetting your password directly:
+                      </p>
+                      <a
+                        href={devInfo.devResetUrl}
+                        className="font-medium text-blue-600 underline break-all hover:text-blue-800"
+                      >
+                        {devInfo.devResetUrl}
+                      </a>
+                    </div>
+                  )}
+
+                  {devInfo?.previewUrl && (
+                    <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3 text-xs text-sky-900">
+                      <a
+                        href={devInfo.previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-sky-600 underline hover:text-sky-800"
+                      >
+                        Preview Ethereal Test Email in Browser
+                      </a>
+                    </div>
+                  )}
 
                   <button
                     type="button"

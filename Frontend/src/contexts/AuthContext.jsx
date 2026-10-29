@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       const result = await authService.forgotPassword(email);
       if (result.success) {
-        return { success: true, message: result.message };
+        return { success: true, message: result.message, data: result.data };
       } else {
         setError(result.error);
         return { success: false, error: result.error };

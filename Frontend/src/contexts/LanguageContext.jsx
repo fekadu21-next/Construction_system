@@ -15,6 +15,7 @@ const translations = {
     tasks: "Tasks & Progress",
     workforce: "Workforce",
     inventory: "Materials & Inventory",
+    equipment: "Equipment & Machinery",
     procurement: "Procurement & Suppliers",
     finance: "Finance & Expenses",
     aiInsights: "AI Insights",
@@ -22,6 +23,10 @@ const translations = {
     auditLogs: "Audit Logs",
     notifications: "Notifications",
     settings: "Settings",
+    materialIssuance: "Material Issuance & Usage",
+    materialRequests: "Material Requests",
+    purchaseOrders: " Purchase Orders",
+    goodsReceiving: "Deliveries & Receiving",
 
     // Project Page
     projectsTitle: "Projects",
@@ -182,6 +187,7 @@ const translations = {
     tasks: "ተግባራት እና ሂደት",
     workforce: "የሰው ኃይል",
     inventory: "ዕቃዎች እና ክምችት",
+    equipment: "መሣሪያዎችና ማሽነሪዎች",
     procurement: "ግዥ እና አቅራቢዎች",
     finance: "ፋይናንስ እና ወጪዎች",
     aiInsights: "የAI ግንዛቤዎች",
@@ -189,6 +195,10 @@ const translations = {
     auditLogs: "የኦዲት መዝገቦች",
     notifications: "ማሳወቂያዎች",
     settings: "ቅንብሮች",
+    materialIssuance: "የዕቃዎች ወጪ እና አጠቃቀም",
+    materialRequests: "የዕቃዎች መጠየቂያ",
+    purchaseOrders: "ግዥ / የትዕዛዝ ደረሰኝ",
+    goodsReceiving: "ርክክብ እና ማከማቻ",
 
     // Project Page
     projectsTitle: "ፕሮጀክቶች",

@@ -1,5 +1,22 @@
 import { useState, useRef, useEffect } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Bell,
+  FolderKanban,
+  CheckSquare,
+  Users,
+  HardHat,
+  Package,
+  ShoppingCart,
+  Coins,
+  Sparkles,
+  TrendingUp,
+  ShieldCheck,
+  Settings,
+  User,
+  LogOut,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useLanguage } from "../contexts/LanguageContext.jsx";
 import { useTheme } from "../contexts/ThemeContext.jsx";
@@ -33,20 +50,20 @@ export default function GeneralManagerLayout() {
 
   // Sidebar navigation list
   const navItems = [
-    { label: t("overview") || "Dashboard", path: "/general-manager/dashboard", icon: "📊" },
-    { label: t("notifications") || "Notifications", path: "/general-manager/notifications", icon: "🔔" },
-    { label: t("projects") || "Projects", path: "/general-manager/projects", icon: "🏗️" },
-    { label: t("tasks") || "Tasks & Progress", path: "/general-manager/tasks", icon: "✅" },
-    { label: t("users") || "User Management", path: "/general-manager/users", icon: "👥" },
-    { label: t("workforce") || "Workforce", path: "/general-manager/workforce", icon: "👷" },
-    { label: t("inventory") || "Materials & Inventory", path: "/general-manager/inventory", icon: "📦" },
-    { label: t("procurement") || "Procurement & Suppliers", path: "/general-manager/procurement", icon: "🛒" },
-    { label: t("finance") || "Finance & Expenses", path: "/general-manager/finance", icon: "💰" },
-    { label: t("aiInsights") || "AI Insights", path: "/general-manager/ai-insights", icon: "🤖" },
-    { label: t("reports") || "Reports & Analytics", path: "/general-manager/reports", icon: "📈" },
-    { label: t("auditLogs") || "Audit Logs", path: "/general-manager/audit-logs", icon: "📋" },
-    { label: t("settings") || "Settings", path: "/general-manager/settings", icon: "⚙️" },
-    { label: t("profile") || "My Profile", path: "/general-manager/profile", icon: "👤" },
+    { label: t("overview") || "Dashboard", path: "/general-manager/dashboard", icon: LayoutDashboard },
+    { label: t("notifications") || "Notifications", path: "/general-manager/notifications", icon: Bell },
+    { label: t("projects") || "Projects", path: "/general-manager/projects", icon: FolderKanban },
+    { label: t("tasks") || "Tasks & Progress", path: "/general-manager/tasks", icon: CheckSquare },
+    { label: t("users") || "User Management", path: "/general-manager/users", icon: Users },
+    { label: t("workforce") || "Workforce", path: "/general-manager/workforce", icon: HardHat },
+    { label: t("inventory") || "Materials & Inventory", path: "/general-manager/inventory", icon: Package },
+    { label: t("procurement") || "Procurement & Suppliers", path: "/general-manager/procurement", icon: ShoppingCart },
+    { label: t("finance") || "Finance & Expenses", path: "/general-manager/finance", icon: Coins },
+    { label: t("aiInsights") || "AI Insights", path: "/general-manager/ai-insights", icon: Sparkles },
+    { label: t("reports") || "Reports & Analytics", path: "/general-manager/reports", icon: TrendingUp },
+    { label: t("auditLogs") || "Audit Logs", path: "/general-manager/audit-logs", icon: ShieldCheck },
+    { label: t("settings") || "Settings", path: "/general-manager/settings", icon: Settings },
+    { label: t("profile") || "My Profile", path: "/general-manager/profile", icon: User },
   ];
 
   return (
@@ -90,21 +107,22 @@ export default function GeneralManagerLayout() {
         </div>
 
         {/* Clean, Scrollable Sidebar Nav List with Increased Font Size and Comfortable Gaps */}
-        <nav className="flex-1 min-h-0 px-3 py-2.5 overflow-y-auto space-y-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="flex-1 min-h-0 px-3 py-3 overflow-y-auto space-y-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item) => {
+            const Icon = item.icon;
             const isActive = location.pathname === item.path || (item.path !== "/general-manager/dashboard" && location.pathname.startsWith(item.path));
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 ${
+                className={`flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 group ${
                   isActive
                     ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-sm shadow-blue-600/30 font-bold"
                     : "text-blue-100/80 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <span className="text-base shrink-0">{item.icon}</span>
+                <Icon className="w-4 h-4 shrink-0 group-hover:scale-110 transition-transform" />
                 <span className="truncate">{item.label}</span>
                 {isActive && (
                   <span className="ml-auto w-2 h-2 rounded-full bg-cyan-300 shadow-xs shadow-cyan-300 shrink-0" />
@@ -120,7 +138,7 @@ export default function GeneralManagerLayout() {
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-rose-100 transition-all duration-150 text-left"
           >
-            <span className="text-base shrink-0">🚪</span>
+            <LogOut className="w-4 h-4 shrink-0" />
             <span className="truncate">{t("logout") || "Logout"}</span>
           </button>
         </div>
@@ -213,7 +231,7 @@ export default function GeneralManagerLayout() {
                               : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
                           }`}
                         >
-                          <span className="text-sm">👤</span>
+                          <User className="w-4 h-4 shrink-0" />
                           <span>{t("profile") || "My Profile"}</span>
                         </NavLink>
 
@@ -227,7 +245,7 @@ export default function GeneralManagerLayout() {
                               : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
                           }`}
                         >
-                          <span className="text-sm">⚙️</span>
+                          <Settings className="w-4 h-4 shrink-0" />
                           <span>{t("settings") || "Settings"}</span>
                         </NavLink>
 
@@ -238,7 +256,7 @@ export default function GeneralManagerLayout() {
                           onClick={handleLogout}
                           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-left"
                         >
-                          <span className="text-sm">🚪</span>
+                          <LogOut className="w-4 h-4 shrink-0" />
                           <span>{t("logout") || "Logout"}</span>
                         </button>
                       </div>

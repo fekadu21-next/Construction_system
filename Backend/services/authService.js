@@ -9,6 +9,8 @@ import {
   normalizeEmail,
 } from "../utils/auth.js";
 import prisma from "../config/prisma.js";
+import { env } from "../config/env.js";
+import emailService from "./emailService.js";
 
 export const authService = {
   async login(email, password, userAgent, ipAddress) {
@@ -390,13 +392,34 @@ export const authService = {
         },
       });
 
+      const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+
+      let emailResult = null;
+      try {
+        emailResult = await emailService.sendPasswordResetEmail({
+          to: user.email,
+          token,
+          resetUrl,
+          userName: user.fullName,
+        });
+      } catch (emailErr) {
+        console.error("Failed to deliver reset email:", emailErr.message);
+        throw new Error("Failed to send password reset email. Please verify email configuration or try again.");
+      }
+
       return {
         success: true,
         message: "Password reset instructions have been sent to your email",
         token,
+        resetUrl,
+        previewUrl: emailResult?.previewUrl || null,
       };
     } catch (error) {
-      if (error.message === "Email is not registered" || error.message === "Account is inactive") {
+      if (
+        error.message === "Email is not registered" ||
+        error.message === "Account is inactive" ||
+        error.message.startsWith("Failed to send password reset email")
+      ) {
         throw error;
       }
       console.error("Forgot password service error:", error);
@@ -429,7 +452,10 @@ export const authService = {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: resetToken.userId },
-        data: { passwordHash: newPasswordHash },
+        data: {
+          passwordHash: newPasswordHash,
+          mustChangePassword: false,
+        },
       }),
       prisma.passwordResetToken.update({
         where: { id: resetToken.id },
@@ -499,10 +525,23 @@ export const authService = {
         },
       });
 
+      const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${token}`;
+      try {
+        await emailService.sendVerificationEmail({
+          to: user.email,
+          token,
+          verificationUrl,
+          userName: user.fullName,
+        });
+      } catch (sendErr) {
+        console.error("Verification email sending warning:", sendErr.message);
+      }
+
       return {
         success: true,
         message: "A verification link has been sent to your email",
         token,
+        verificationUrl,
       };
     } catch (error) {
       if (

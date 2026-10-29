@@ -11,7 +11,9 @@ export default function CreateProjectPage() {
   const navigate = useNavigate();
 
   const [projectManagers, setProjectManagers] = useState([]);
+  const [supervisors, setSupervisors] = useState([]);
   const [loadingPMs, setLoadingPMs] = useState(true);
+  const [loadingSupervisors, setLoadingSupervisors] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [error, setError] = useState("");
@@ -28,10 +30,12 @@ export default function CreateProjectPage() {
     budget: "",
     currency: "ETB",
     projectManagerId: "",
+    supervisorId: "",
   });
 
   useEffect(() => {
     fetchPMs();
+    fetchSupervisors();
     generateCode();
   }, []);
 
@@ -46,6 +50,20 @@ export default function CreateProjectPage() {
       console.warn("Could not load project managers");
     } finally {
       setLoadingPMs(false);
+    }
+  };
+
+  const fetchSupervisors = async () => {
+    try {
+      setLoadingSupervisors(true);
+      const res = await usersApi.getSupervisors();
+      if (res.success) {
+        setSupervisors(res.data || []);
+      }
+    } catch {
+      console.warn("Could not load supervisors");
+    } finally {
+      setLoadingSupervisors(false);
     }
   };
 
@@ -99,6 +117,7 @@ export default function CreateProjectPage() {
         ...formData,
         budget: parseFloat(formData.budget),
         projectManagerId: formData.projectManagerId || null,
+        supervisorId: formData.supervisorId || null,
       };
 
       const res = await projectsApi.createProject(payload);
@@ -108,7 +127,7 @@ export default function CreateProjectPage() {
         setError(res.error || "Unable to create project.");
       }
     } catch (err) {
-      setError(err.message || "An unexpected error occurred while creating project.");
+      setError(err.message || "An unexpected error occurred while creating the project.");
     } finally {
       setSaving(false);
     }
@@ -116,49 +135,38 @@ export default function CreateProjectPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
-      {/* Breadcrumb & Navigation */}
+      {/* Header with back button */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link to="/general-manager/projects" className="hover:text-blue-600 transition-colors">
-            {t("projectsTitle")}
+        <div>
+          <Link
+            to="/general-manager/projects"
+            className="text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1 mb-1"
+          >
+            ← {t("projectsNav")}
           </Link>
-          <span>/</span>
-          <span className="text-slate-900 dark:text-white font-semibold">{t("createProjectBtn")}</span>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            {t("createProjectHeader")}
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            {t("createProjectSubheader")}
+          </p>
         </div>
-        <Link
-          to="/general-manager/projects"
-          className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-        >
-          ← {t("cancelBtn")}
-        </Link>
       </div>
 
-      {/* Main Header Card */}
-      <div className={`p-6 sm:p-8 rounded-2xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80"} shadow-sm`}>
-        <div className="flex items-start gap-4">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center text-2xl shadow-md shadow-blue-500/20 shrink-0">
-            🏗️
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">{t("createProjectTitle")}</h1>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              {t("projectsSubtitle")}
-            </p>
-          </div>
+      {error && (
+        <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <span>⚠️</span> {error}
         </div>
+      )}
 
-        {error && (
-          <div className="mt-6 p-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm flex items-start gap-3">
-            <span className="text-lg">⚠️</span>
-            <div>
-              <p className="font-bold">Error saving project</p>
-              <p className="mt-0.5">{error}</p>
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-8 space-y-8">
-          {/* SECTION 1 — BASIC PROJECT INFORMATION */}
+      {/* Main Form Container */}
+      <div
+        className={`p-6 sm:p-8 rounded-2xl border ${
+          isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80 shadow-xs"
+        }`}
+      >
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* SECTION 1 — BASIC PROJECT INFO */}
           <section className="space-y-4">
             <div className="border-b pb-2 border-slate-200 dark:border-slate-800">
               <h2 className="text-lg font-bold text-blue-600 dark:text-cyan-400 flex items-center gap-2">
@@ -175,10 +183,10 @@ export default function CreateProjectPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Commercial Plaza Tower Phase 1"
+                  placeholder="e.g. Bole International Terminal Expansion"
                   value={formData.projectName}
                   onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
                     fieldErrors.projectName
                       ? "border-red-500 bg-red-50/30 dark:bg-red-950/20"
                       : isDark
@@ -186,41 +194,43 @@ export default function CreateProjectPage() {
                       : "bg-white border-slate-300 text-slate-900"
                   }`}
                 />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{t("projectNameHelp")}</p>
-                {fieldErrors.projectName && <p className="text-xs text-red-500 mt-0.5">{fieldErrors.projectName}</p>}
+                {fieldErrors.projectName && (
+                  <p className="text-xs text-red-500 mt-1">{fieldErrors.projectName}</p>
+                )}
               </div>
 
               {/* Project Code */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                  {t("projectCodeLabel")} <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="BM-PRJ-0001"
-                    value={formData.projectCode}
-                    onChange={(e) => setFormData({ ...formData, projectCode: e.target.value.toUpperCase() })}
-                    className={`flex-1 px-4 py-2.5 rounded-xl border font-mono text-sm uppercase transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
-                      fieldErrors.projectCode
-                        ? "border-red-500 bg-red-50/30 dark:bg-red-950/20"
-                        : isDark
-                        ? "bg-slate-900/80 border-slate-700 text-white"
-                        : "bg-white border-slate-300 text-slate-900"
-                    }`}
-                  />
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>
+                    {t("projectCodeLabel")} <span className="text-red-500">*</span>
+                  </span>
                   <button
                     type="button"
                     onClick={generateCode}
                     disabled={generatingCode}
-                    className="px-3 py-2 text-xs font-bold rounded-xl border border-blue-500 text-blue-600 dark:text-cyan-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors shrink-0"
-                    title="Generate unique sequential project code"
+                    className="text-[11px] text-blue-600 dark:text-cyan-400 font-semibold hover:underline"
                   >
-                    {generatingCode ? "..." : t("autoGenerateBtn")}
+                    {generatingCode ? "Generating..." : "Generate New Code"}
                   </button>
-                </div>
+                </label>
+                <input
+                  type="text"
+                  placeholder="BM-PRJ-0001"
+                  value={formData.projectCode}
+                  onChange={(e) => setFormData({ ...formData, projectCode: e.target.value.toUpperCase() })}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-mono font-bold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                    fieldErrors.projectCode
+                      ? "border-red-500 bg-red-50/30 dark:bg-red-950/20"
+                      : isDark
+                      ? "bg-slate-900/80 border-slate-700 text-white"
+                      : "bg-white border-slate-300 text-slate-900"
+                  }`}
+                />
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{t("projectCodeHelp")}</p>
-                {fieldErrors.projectCode && <p className="text-xs text-red-500 mt-0.5">{fieldErrors.projectCode}</p>}
+                {fieldErrors.projectCode && (
+                  <p className="text-xs text-red-500 mt-0.5">{fieldErrors.projectCode}</p>
+                )}
               </div>
 
               {/* Location */}
@@ -230,10 +240,10 @@ export default function CreateProjectPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Addis Ababa, Bole Sub-city"
+                  placeholder="e.g. Addis Ababa, Bole Sub-City"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
                     fieldErrors.location
                       ? "border-red-500 bg-red-50/30 dark:bg-red-950/20"
                       : isDark
@@ -241,8 +251,7 @@ export default function CreateProjectPage() {
                       : "bg-white border-slate-300 text-slate-900"
                   }`}
                 />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{t("locationHelp")}</p>
-                {fieldErrors.location && <p className="text-xs text-red-500 mt-0.5">{fieldErrors.location}</p>}
+                {fieldErrors.location && <p className="text-xs text-red-500 mt-1">{fieldErrors.location}</p>}
               </div>
 
               {/* Description */}
@@ -252,19 +261,18 @@ export default function CreateProjectPage() {
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Detailed scope of construction, building specs, key milestones..."
+                  placeholder="Outline key project objectives, structural scope, client expectations..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
                     isDark ? "bg-slate-900/80 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
                   }`}
                 />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{t("descriptionHelp")}</p>
               </div>
             </div>
           </section>
 
-          {/* SECTION 2 — SCHEDULE AND STATUS */}
+          {/* SECTION 2 — TIMELINE & INITIAL STATUS */}
           <section className="space-y-4">
             <div className="border-b pb-2 border-slate-200 dark:border-slate-800">
               <h2 className="text-lg font-bold text-blue-600 dark:text-cyan-400 flex items-center gap-2">
@@ -274,7 +282,7 @@ export default function CreateProjectPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* Planned Start Date */}
+              {/* Start Date */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                   {t("startDateLabel")} <span className="text-red-500">*</span>
@@ -283,7 +291,7 @@ export default function CreateProjectPage() {
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
                     fieldErrors.startDate
                       ? "border-red-500 bg-red-50/30 dark:bg-red-950/20"
                       : isDark
@@ -291,20 +299,20 @@ export default function CreateProjectPage() {
                       : "bg-white border-slate-300 text-slate-900"
                   }`}
                 />
-                {fieldErrors.startDate && <p className="text-xs text-red-500 mt-0.5">{fieldErrors.startDate}</p>}
+                {fieldErrors.startDate && <p className="text-xs text-red-500 mt-1">{fieldErrors.startDate}</p>}
               </div>
 
-              {/* Planned End Date */}
+              {/* End Date */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                   {t("endDateLabel")}
                 </label>
                 <input
                   type="date"
-                  value={formData.endDate}
                   min={formData.startDate}
+                  value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
                     fieldErrors.endDate
                       ? "border-red-500 bg-red-50/30 dark:bg-red-950/20"
                       : isDark
@@ -312,11 +320,10 @@ export default function CreateProjectPage() {
                       : "bg-white border-slate-300 text-slate-900"
                   }`}
                 />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{t("endDateHelp")}</p>
-                {fieldErrors.endDate && <p className="text-xs text-red-500 mt-0.5">{fieldErrors.endDate}</p>}
+                {fieldErrors.endDate && <p className="text-xs text-red-500 mt-1">{fieldErrors.endDate}</p>}
               </div>
 
-              {/* Initial Status */}
+              {/* Status */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                   {t("initialStatusLabel")}
@@ -397,35 +404,63 @@ export default function CreateProjectPage() {
             </div>
           </section>
 
-          {/* SECTION 4 — PROJECT MANAGER ASSIGNMENT */}
+          {/* SECTION 4 — MANAGEMENT & SITE SUPERVISION */}
           <section className="space-y-4">
             <div className="border-b pb-2 border-slate-200 dark:border-slate-800">
               <h2 className="text-lg font-bold text-blue-600 dark:text-cyan-400 flex items-center gap-2">
-                <span>04</span> {t("section4Title")}
+                <span>04</span> Key Personnel & Site Supervision
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t("section4Desc")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Assign the Project Manager to oversee progress and the Site Supervisor to manage daily laborer attendance on site.
+              </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                {t("managerFilter")}
-              </label>
-              <select
-                value={formData.projectManagerId}
-                onChange={(e) => setFormData({ ...formData, projectManagerId: e.target.value })}
-                disabled={loadingPMs}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
-                  isDark ? "bg-slate-900/80 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
-                }`}
-              >
-                <option value="">{t("unassignedOption")}</option>
-                {projectManagers.map((pm) => (
-                  <option key={pm.id} value={pm.id}>
-                    👤 {pm.fullName} ({pm.email})
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{t("managerHelp")}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                  Project Manager
+                </label>
+                <select
+                  value={formData.projectManagerId}
+                  onChange={(e) => setFormData({ ...formData, projectManagerId: e.target.value })}
+                  disabled={loadingPMs}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                    isDark ? "bg-slate-900/80 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                  }`}
+                >
+                  <option value="">{t("unassignedOption")}</option>
+                  {projectManagers.map((pm) => (
+                    <option key={pm.id} value={pm.id}>
+                      👤 {pm.fullName} ({pm.email})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{t("managerHelp")}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                  Site Supervisor
+                </label>
+                <select
+                  value={formData.supervisorId}
+                  onChange={(e) => setFormData({ ...formData, supervisorId: e.target.value })}
+                  disabled={loadingSupervisors}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                    isDark ? "bg-slate-900/80 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                  }`}
+                >
+                  <option value="">{t("unassignedOption")}</option>
+                  {supervisors.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      🦺 {s.fullName} ({s.email})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Responsible for on-site daily attendance, laborer muster, and shift reports.
+                </p>
+              </div>
             </div>
           </section>
 

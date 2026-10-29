@@ -1,5 +1,5 @@
 import express from "express";
-import { supervisorController } from "../controllers/supervisorController.js";
+import { supervisorController } from "../controllers/supervisor/supervisorController.js";
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
 import { USER_ROLES } from "../constants/roles.js";
 

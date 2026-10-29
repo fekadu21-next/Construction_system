@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { supervisorApi } from "../../services/supervisorApi.js";
 import { useSearchParams } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
@@ -78,7 +78,7 @@ export default function SupervisorAttendancePage() {
       const res = await supervisorApi.getAttendance(selectedProjectId, selectedDate);
       if (res.success) {
         setAttendanceData(res.data);
-        setRoster(res.data.roster || []);
+        setRoster((res.data.roster || []).filter(w => w.trade !== "SUPERVISOR" && w.trade !== "SUPERVISER"));
       } else {
         setStatusMsg({ text: res.error, type: "error" });
       }
@@ -277,6 +277,7 @@ export default function SupervisorAttendancePage() {
       SCAFFOLDER: "Scaffolder",
       HEAVY_OPERATOR: "Heavy Equipment Operator",
       SITE_HELPER: "Site Helper",
+      SUPERVISOR: "Site Supervisor",
     };
     return map[trade] || trade.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
@@ -302,8 +303,9 @@ export default function SupervisorAttendancePage() {
     return sum + hours * hourlyRate + ot * hourlyRate * 1.5;
   }, 0);
 
-  // Filtered Roster
+  // Filtered Roster (supervisor is excluded from attendance table)
   const filteredRoster = roster.filter((worker) => {
+    if (worker.trade === "SUPERVISOR" || worker.trade === "SUPERVISER") return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const nameMatch = (worker.fullName || "").toLowerCase().includes(q);
@@ -800,6 +802,11 @@ export default function SupervisorAttendancePage() {
                               {row.employeeStatus === "PENDING_APPROVAL" && (
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
                                   Pending HR
+                                </span>
+                              )}
+                              {row.trade === "SUPERVISOR" && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-purple-500/25 text-purple-300 border border-purple-500/40 shrink-0 flex items-center gap-1">
+                                  <span>ðŸ¦º</span> Site Supervisor
                                 </span>
                               )}
                               {row.employmentType === "DAILY_LABORER" && (

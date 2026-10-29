@@ -262,4 +262,24 @@ export const userController = {
       });
     }
   },
+
+  async getSupervisors(req, res, next) {
+    try {
+      const supervisors = await userService.getSupervisors();
+      res.json({
+        success: true,
+        data: supervisors,
+      });
+    } catch (error) {
+      console.error("Get supervisors error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to fetch site supervisors. Please try again.",
+      });
+      res.status(500).json({
+        success: false,
+        message: "Unable to fetch project managers. Please try again.",
+      });
+    }
+  },
 };

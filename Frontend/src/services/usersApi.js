@@ -108,4 +108,14 @@ export const usersApi = {
       return { success: false, error: message };
     }
   },
+
+  async getSupervisors() {
+    try {
+      const response = await api.get("/api/users/supervisors");
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch site supervisors";
+      return { success: false, error: message };
+    }
+  },
 };

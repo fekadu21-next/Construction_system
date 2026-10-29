@@ -1,5 +1,5 @@
 import express from "express";
-import { accountantController } from "../controllers/accountantController.js";
+import { accountantController } from "../controllers/accountant/accountantController.js";
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
 import { USER_ROLES } from "../constants/roles.js";
 

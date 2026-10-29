@@ -1,5 +1,5 @@
 import express from "express";
-import { hrController } from "../controllers/hrController.js";
+import { hrController } from "../controllers/hr/hrController.js";
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
 import { USER_ROLES } from "../constants/roles.js";
 import {

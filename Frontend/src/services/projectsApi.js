@@ -71,6 +71,16 @@ export const projectsApi = {
     }
   },
 
+  async assignSupervisor(id, supervisorId) {
+    try {
+      const response = await api.patch(`/api/projects/${id}/supervisor`, { supervisorId });
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to assign site supervisor";
+      return { success: false, error: message };
+    }
+  },
+
   async updateProjectStatus(id, status) {
     try {
       const response = await api.patch(`/api/projects/${id}/status`, { status });

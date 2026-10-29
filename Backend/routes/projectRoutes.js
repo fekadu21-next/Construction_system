@@ -21,19 +21,27 @@ const PROJECT_VIEWERS = [
   USER_ROLES.ACCOUNTANT,
   USER_ROLES.SUPERVISOR,
   "SUPERVISER",
+  "ADMIN",
+];
+
+const PROJECT_EDITORS = [
+  USER_ROLES.GENERAL_MANAGER,
+  USER_ROLES.PROJECT_MANAGER,
+  "ADMIN",
 ];
 
 router.get("/metrics", authorize(...PROJECT_VIEWERS), projectController.getProjectMetrics);
-router.get("/next-code", authorize(USER_ROLES.GENERAL_MANAGER), projectController.getNextProjectCode);
+router.get("/next-code", authorize(...PROJECT_EDITORS), projectController.getNextProjectCode);
 router.get("/", authorize(...PROJECT_VIEWERS), projectController.getProjects);
 router.get("/:id", authorize(...PROJECT_VIEWERS), projectController.getProjectById);
 
-// Creation and modification restricted strictly to General Manager
-router.post("/", authorize(USER_ROLES.GENERAL_MANAGER), validateCreateProject, projectController.createProject);
-router.patch("/:id", authorize(USER_ROLES.GENERAL_MANAGER), validateUpdateProject, projectController.updateProject);
-router.patch("/:id/manager", authorize(USER_ROLES.GENERAL_MANAGER), validateAssignManager, projectController.assignManager);
-router.patch("/:id/status", authorize(USER_ROLES.GENERAL_MANAGER), validateStatusUpdate, projectController.updateProjectStatus);
-router.patch("/:id/archive", authorize(USER_ROLES.GENERAL_MANAGER), projectController.archiveProject);
-router.delete("/:id", authorize(USER_ROLES.GENERAL_MANAGER), projectController.deleteProject);
+// Creation and modification restricted to GM and PM
+router.post("/", authorize(...PROJECT_EDITORS), validateCreateProject, projectController.createProject);
+router.patch("/:id", authorize(...PROJECT_EDITORS), validateUpdateProject, projectController.updateProject);
+router.patch("/:id/manager", authorize(...PROJECT_EDITORS), validateAssignManager, projectController.assignManager);
+router.patch("/:id/supervisor", authorize(...PROJECT_EDITORS), projectController.assignSupervisor);
+router.patch("/:id/status", authorize(...PROJECT_EDITORS), validateStatusUpdate, projectController.updateProjectStatus);
+router.patch("/:id/archive", authorize(USER_ROLES.GENERAL_MANAGER, "ADMIN"), projectController.archiveProject);
+router.delete("/:id", authorize(USER_ROLES.GENERAL_MANAGER, "ADMIN"), projectController.deleteProject);
 
 export default router;

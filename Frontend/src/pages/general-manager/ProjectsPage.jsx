@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { projectsApi } from "../../services/projectsApi.js";
 import { usersApi } from "../../services/usersApi.js";
@@ -62,10 +62,13 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
     currency: "ETB",
     status: "PLANNED",
     projectManagerId: "",
+    supervisorId: "",
   });
   const [formErrors, setFormErrors] = useState({});
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [assignManagerId, setAssignManagerId] = useState("");
+  const [assignSupervisorId, setAssignSupervisorId] = useState("");
+  const [supervisors, setSupervisors] = useState([]);
 
   // Status configuration with theme badges
   const STATUS_CONFIG = {
@@ -103,6 +106,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
 
   useEffect(() => {
     fetchProjectManagers();
+    fetchSupervisors();
   }, []);
 
   useEffect(() => {
@@ -156,6 +160,17 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
     }
   };
 
+  const fetchSupervisors = async () => {
+    try {
+      const res = await usersApi.getSupervisors();
+      if (res.success) {
+        setSupervisors(res.data || []);
+      }
+    } catch (err) {
+      console.warn("Could not load supervisors list");
+    }
+  };
+
   const handleManualRefresh = () => {
     setRefreshing(true);
     fetchProjects();
@@ -194,6 +209,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
       currency: "ETB",
       status: "PLANNED",
       projectManagerId: "",
+    supervisorId: "",
     });
     setEditingProject(null);
     setShowCreateModal(true);
@@ -214,6 +230,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
       currency: project.currency || "ETB",
       status: project.status || "PLANNED",
       projectManagerId: project.projectManagerId || "",
+      supervisorId: project.supervisorId || "",
     });
     setShowCreateModal(true);
   };
@@ -222,6 +239,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
   const openAssignModal = (project) => {
     setAssigningProject(project);
     setAssignManagerId(project.projectManagerId || "");
+    setAssignSupervisorId(project.supervisorId || "");
   };
 
   const handleQuickAssignSubmit = async (e) => {
@@ -230,7 +248,24 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
 
     setFormSubmitting(true);
     try {
-      const res = await projectsApi.assignManager(assigningProject.id, assignManagerId || null);
+      const promises = [];
+      if (assignManagerId !== (assigningProject.projectManagerId || "")) {
+        promises.push(projectsApi.assignManager(assigningProject.id, assignManagerId || null));
+      }
+      if (assignSupervisorId !== (assigningProject.supervisorId || "")) {
+        promises.push(projectsApi.assignSupervisor(assigningProject.id, assignSupervisorId || null));
+      }
+
+      const results = await Promise.all(promises);
+      const failed = results.find((r) => !r.success);
+
+      if (!failed) {
+        setSuccessMessage("Project personnel assignments updated successfully.");
+        setAssigningProject(null);
+        fetchProjects();
+        return;
+      }
+      const res = failed;
       if (res.success) {
         setSuccessMessage("Project manager assignment updated successfully.");
         setAssigningProject(null);
@@ -275,6 +310,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
         ...formData,
         budget: parseFloat(formData.budget),
         projectManagerId: formData.projectManagerId || null,
+        supervisorId: formData.supervisorId || null,
       };
 
       let res;
@@ -710,6 +746,9 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">
                   {t("tableManager")}
                 </th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">
+                  Site Supervisor
+                </th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-right">
                   {t("tableActions")}
                 </th>
@@ -719,7 +758,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-8 h-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
                       <p className="text-sm font-medium">{t("loadingProjects")}</p>
@@ -728,7 +767,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
                 </tr>
               ) : projects.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <span className="text-3xl">🏗️</span>
                       <p className="text-base font-bold text-slate-700 dark:text-slate-300">
@@ -822,6 +861,28 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
                             </div>
                             <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">
                               {project.projectManager.fullName}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => openAssignModal(project)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition-colors"
+                          >
+                            <span>⚠️</span>
+                            <span>{t("unassigned")}</span>
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Site Supervisor */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {project.supervisor ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 to-orange-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                              {project.supervisor.fullName?.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">
+                              {project.supervisor.fullName}
                             </span>
                           </div>
                         ) : (
@@ -1146,6 +1207,25 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
                   </select>
                   <p className="text-[11px] text-slate-400 mt-1">{t("managerHelp")}</p>
                 </div>
+
+                <div className="mt-4">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Site Supervisor
+                  </label>
+                  <select
+                    value={formData.supervisorId}
+                    onChange={(e) => setFormData({ ...formData, supervisorId: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl border text-sm dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/30 outline-none"
+                  >
+                    <option value="">{t("unassignedOption")}</option>
+                    {supervisors.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        🦺 {s.fullName} ({s.email})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">Responsible for field workforce attendance, task logs, and daily materials.</p>
+                </div>
               </div>
 
               {/* Modal footer */}
@@ -1285,6 +1365,50 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
                 )}
               </div>
 
+              {/* Site Supervisor Details */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Site Supervisor
+                </h4>
+                {viewingProject.supervisor ? (
+                  <div className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-600 to-orange-600 text-white font-bold flex items-center justify-center text-sm">
+                      {viewingProject.supervisor.fullName?.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{viewingProject.supervisor.fullName}</p>
+                      <p className="text-xs text-slate-400">{viewingProject.supervisor.email}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const proj = viewingProject;
+                        setViewingProject(null);
+                        openAssignModal(proj);
+                      }}
+                      className="ml-auto text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline"
+                    >
+                      {t("assignAction")}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed border-amber-300 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/20 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-semibold">
+                      <span>⚠️</span> No Site Supervisor Assigned
+                    </div>
+                    <button
+                      onClick={() => {
+                        const proj = viewingProject;
+                        setViewingProject(null);
+                        openAssignModal(proj);
+                      }}
+                      className="px-3 py-1 text-xs font-bold rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                    >
+                      {t("assignAction")}
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Description */}
               {viewingProject.description && (
                 <div>
@@ -1344,7 +1468,7 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
             <form onSubmit={handleQuickAssignSubmit} className="mt-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-400 mb-1.5">
-                  {t("selectManagerPrompt")}
+                  Select Project Manager
                 </label>
                 <select
                   value={assignManagerId}
@@ -1355,6 +1479,24 @@ export default function ProjectsPage({ defaultOpenCreate = false }) {
                   {projectManagers.map((pm) => (
                     <option key={pm.id} value={pm.id}>
                       👤 {pm.fullName} ({pm.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-400 mb-1.5">
+                  Select Site Supervisor
+                </label>
+                <select
+                  value={assignSupervisorId}
+                  onChange={(e) => setAssignSupervisorId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/30 outline-none"
+                >
+                  <option value="">{t("unassignedOption")}</option>
+                  {supervisors.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      🦺 {s.fullName} ({s.email})
                     </option>
                   ))}
                 </select>

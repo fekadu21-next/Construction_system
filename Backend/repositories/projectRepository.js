@@ -1,5 +1,33 @@
 import prisma from "../config/prisma.js";
 
+const projectInclude = {
+  projectManager: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phone: true,
+      profilePhotoUrl: true,
+    },
+  },
+  supervisor: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phone: true,
+      profilePhotoUrl: true,
+    },
+  },
+  createdBy: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+    },
+  },
+};
+
 export const projectRepository = {
   async findMany({ where = {}, skip = 0, take = 10, orderBy = { createdAt: "desc" } }) {
     return prisma.project.findMany({
@@ -7,23 +35,7 @@ export const projectRepository = {
       skip,
       take,
       orderBy,
-      include: {
-        projectManager: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            profilePhotoUrl: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: projectInclude,
     });
   },
 
@@ -34,23 +46,7 @@ export const projectRepository = {
   async findById(id) {
     return prisma.project.findUnique({
       where: { id },
-      include: {
-        projectManager: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            profilePhotoUrl: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: projectInclude,
     });
   },
 
@@ -63,23 +59,7 @@ export const projectRepository = {
   async create(data) {
     return prisma.project.create({
       data,
-      include: {
-        projectManager: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            profilePhotoUrl: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: projectInclude,
     });
   },
 
@@ -87,23 +67,7 @@ export const projectRepository = {
     return prisma.project.update({
       where: { id },
       data,
-      include: {
-        projectManager: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            profilePhotoUrl: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: projectInclude,
     });
   },
 

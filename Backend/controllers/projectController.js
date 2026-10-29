@@ -9,6 +9,7 @@ export const projectController = {
         search,
         status,
         managerId,
+        supervisorId,
         startDateFrom,
         startDateTo,
         sortBy,
@@ -22,6 +23,7 @@ export const projectController = {
         search,
         status,
         managerId,
+        supervisorId,
         startDateFrom,
         startDateTo,
         sortBy,
@@ -114,14 +116,16 @@ export const projectController = {
       if (
         error.message === "Project code already exists" ||
         error.message === "Selected project manager is not active" ||
-        error.message === "Selected user is not a Project Manager"
+        error.message === "Selected user is not a Project Manager" ||
+        error.message === "Selected site supervisor is not active" ||
+        error.message === "Selected user is not a Site Supervisor"
       ) {
         return res.status(400).json({
           success: false,
           message: error.message,
         });
       }
-      if (error.message === "Project manager not found") {
+      if (error.message === "Project manager not found" || error.message === "Site supervisor not found") {
         return res.status(404).json({
           success: false,
           message: error.message,
@@ -159,14 +163,16 @@ export const projectController = {
         error.message === "Project code already exists" ||
         error.message === "Budget must be a non-negative number" ||
         error.message === "Selected project manager is not active" ||
-        error.message === "Selected user is not a Project Manager"
+        error.message === "Selected user is not a Project Manager" ||
+        error.message === "Selected site supervisor is not active" ||
+        error.message === "Selected user is not a Site Supervisor"
       ) {
         return res.status(400).json({
           success: false,
           message: error.message,
         });
       }
-      if (error.message === "Project manager not found") {
+      if (error.message === "Project manager not found" || error.message === "Site supervisor not found") {
         return res.status(404).json({
           success: false,
           message: error.message,
@@ -212,13 +218,56 @@ export const projectController = {
       if (error.message === "Project manager not found") {
         return res.status(404).json({
           success: false,
-          message: "Project manager not found",
+          message: error.message,
         });
       }
       console.error("Assign manager unexpected error:", error);
       res.status(500).json({
         success: false,
         message: "Unable to assign project manager. Please try again.",
+      });
+    }
+  },
+
+  async assignSupervisor(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { supervisorId } = req.body;
+      const actorId = req.userId;
+
+      const project = await projectService.assignSupervisor(id, supervisorId, actorId);
+
+      res.json({
+        success: true,
+        data: project,
+        message: "Site supervisor assigned successfully",
+      });
+    } catch (error) {
+      if (error.message === "Project not found") {
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
+      }
+      if (
+        error.message === "Selected site supervisor is not active" ||
+        error.message === "Selected user is not a Site Supervisor"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      if (error.message === "Site supervisor not found") {
+        return res.status(404).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      console.error("Assign supervisor unexpected error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to assign site supervisor. Please try again.",
       });
     }
   },

@@ -716,4 +716,27 @@ export const userService = {
 
     return projectManagers;
   },
+
+  async getSupervisors() {
+    return prisma.user.findMany({
+      where: {
+        role: { name: { in: ["SUPERVISOR", "SUPERVISER"] } },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        profilePhotoUrl: true,
+        role: {
+          select: {
+            name: true,
+            description: true,
+          },
+        },
+      },
+      orderBy: { fullName: "asc" },
+    });
+  },
 };

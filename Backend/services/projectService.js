@@ -10,6 +10,7 @@ export const projectService = {
     search = "",
     status = "",
     managerId = "",
+    supervisorId = "",
     startDateFrom = "",
     startDateTo = "",
     sortBy = "createdAt",
@@ -47,6 +48,13 @@ export const projectService = {
       where.projectManagerId = null;
     } else if (managerId && managerId.trim()) {
       where.projectManagerId = managerId.trim();
+    }
+
+    // Supervisor filter
+    if (supervisorId === "unassigned") {
+      where.supervisorId = null;
+    } else if (supervisorId && supervisorId.trim()) {
+      where.supervisorId = supervisorId.trim();
     }
 
     // Date range filter
@@ -144,6 +152,21 @@ export const projectService = {
       }
     }
 
+    // Validate Site Supervisor if assigned
+    const supId = data.supervisorId && data.supervisorId.trim() ? data.supervisorId.trim() : null;
+    if (supId) {
+      const supervisor = await userRepository.findById(supId);
+      if (!supervisor) {
+        throw new Error("Site supervisor not found");
+      }
+      if (!supervisor.isActive) {
+        throw new Error("Selected site supervisor is not active");
+      }
+      if (!["SUPERVISOR", "SUPERVISER"].includes(supervisor.role?.name)) {
+        throw new Error("Selected user is not a Site Supervisor");
+      }
+    }
+
     const project = await projectRepository.create({
       projectName: data.projectName.trim(),
       projectCode: code,
@@ -155,6 +178,7 @@ export const projectService = {
       currency: (data.currency || DEFAULT_CURRENCY).trim().toUpperCase(),
       status: data.status || "PLANNED",
       projectManagerId: pmId,
+      supervisorId: supId,
       createdById: actorId,
     });
 
@@ -173,6 +197,7 @@ export const projectService = {
           currency: project.currency,
           status: project.status,
           projectManagerId: project.projectManagerId,
+          supervisorId: project.supervisorId,
         },
       },
     });
@@ -252,6 +277,23 @@ export const projectService = {
       updateData.projectManagerId = pmId;
     }
 
+    if (data.supervisorId !== undefined) {
+      const supId = data.supervisorId && data.supervisorId.trim() ? data.supervisorId.trim() : null;
+      if (supId) {
+        const supervisor = await userRepository.findById(supId);
+        if (!supervisor) {
+          throw new Error("Site supervisor not found");
+        }
+        if (!supervisor.isActive) {
+          throw new Error("Selected site supervisor is not active");
+        }
+        if (!["SUPERVISOR", "SUPERVISER"].includes(supervisor.role?.name)) {
+          throw new Error("Selected user is not a Site Supervisor");
+        }
+      }
+      updateData.supervisorId = supId;
+    }
+
     const updated = await projectRepository.update(id, updateData);
 
     await prisma.auditLog.create({
@@ -300,6 +342,46 @@ export const projectService = {
         details: {
           previousManager,
           newManagerId: pmId,
+        },
+      },
+    });
+
+    return updated;
+  },
+
+  async assignSupervisor(id, supervisorId, actorId) {
+    const project = await projectRepository.findById(id);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const supId = supervisorId && supervisorId.trim() ? supervisorId.trim() : null;
+    if (supId) {
+      const supervisor = await userRepository.findById(supId);
+      if (!supervisor) {
+        throw new Error("Site supervisor not found");
+      }
+      if (!supervisor.isActive) {
+        throw new Error("Selected site supervisor is not active");
+      }
+      if (!["SUPERVISOR", "SUPERVISER"].includes(supervisor.role?.name)) {
+        throw new Error("Selected user is not a Site Supervisor");
+      }
+    }
+
+    const previousSupervisor = project.supervisor?.fullName || "Unassigned";
+
+    const updated = await projectRepository.update(id, { supervisorId: supId });
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: actorId,
+        action: "PROJECT_SUPERVISOR_ASSIGNED",
+        entityType: "Project",
+        entityId: id,
+        details: {
+          previousSupervisor,
+          newSupervisorId: supId,
         },
       },
     });

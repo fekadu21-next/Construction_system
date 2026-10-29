@@ -1,4 +1,4 @@
-import pg from "pg";
+﻿import pg from "pg";
 import { env } from "./env.js";
 
 const { Pool } = pg;
@@ -129,6 +129,35 @@ async function ensureSupervisorTables(client) {
       );
       CREATE INDEX IF NOT EXISTS "daily_site_activities_projectId_idx" ON "daily_site_activities"("projectId");
       CREATE INDEX IF NOT EXISTS "daily_site_activities_activityDate_idx" ON "daily_site_activities"("activityDate");
+
+      -- Ensure supervisorId column exists on projects
+      ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "supervisorId" TEXT REFERENCES "users"("id") ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "projects_supervisorId_idx" ON "projects"("supervisorId");
+
+      -- Clean up previous bulk auto-assignment if multiple projects were attached to a single supervisor
+      -- so each supervisor strictly only retains their latest explicitly assigned site
+      WITH dupes AS (
+        SELECT "supervisorId", COUNT(*) as cnt
+        FROM "projects"
+        WHERE "supervisorId" IS NOT NULL
+        GROUP BY "supervisorId"
+        HAVING COUNT(*) > 1
+      )
+      UPDATE "projects" p
+      SET "supervisorId" = NULL
+      FROM dupes d
+      WHERE p."supervisorId" = d."supervisorId"
+        AND p.id NOT IN (
+          SELECT p2.id FROM "projects" p2
+          WHERE p2."supervisorId" = d."supervisorId"
+          ORDER BY p2."updatedAt" DESC
+          LIMIT 1
+        );
+
+      -- Ensure supervisors are removed from daily site attendance worker rosters
+      UPDATE "employees"
+      SET "assignedProjectId" = NULL
+      WHERE "trade" IN ('SUPERVISOR', 'SUPERVISER');
     `);
     console.log("Supervisor and site operations tables verified successfully.");
   } catch (err) {

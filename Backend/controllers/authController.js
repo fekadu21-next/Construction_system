@@ -67,13 +67,15 @@ export const authController = {
 
       const result = await authService.refresh(refreshToken, userAgent, ipAddress);
 
-      res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
+      if (result.refreshToken) {
+        res.cookie("refreshToken", result.refreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: "/",
+        });
+      }
 
       res.json({
         success: true,
@@ -312,6 +314,31 @@ export const authController = {
       res.status(500).json({
         success: false,
         message: "Unable to send verification email. Please try again.",
+      });
+    }
+  },
+
+  async updateProfile(req, res, next) {
+    try {
+      const userId = req.userId;
+      const { fullName, phone, profilePhotoUrl } = req.body;
+
+      const updatedUser = await authService.updateProfile(userId, {
+        fullName,
+        phone,
+        profilePhotoUrl,
+      });
+
+      res.json({
+        success: true,
+        data: updatedUser,
+        message: "Profile updated successfully",
+      });
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to update profile",
       });
     }
   },

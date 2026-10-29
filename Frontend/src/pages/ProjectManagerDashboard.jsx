@@ -1,11 +1,5 @@
-import WelcomeDashboard from "../components/WelcomeDashboard.jsx";
-import { RoleProtectedRoute } from "../components/ProtectedRoute.jsx";
-import { USER_ROLES } from "../constants/roles.js";
+import { Navigate } from "react-router-dom";
 
 export default function ProjectManagerDashboard() {
-  return (
-    <RoleProtectedRoute allowedRoles={[USER_ROLES.PROJECT_MANAGER]}>
-      <WelcomeDashboard title="Project Manager Dashboard" />
-    </RoleProtectedRoute>
-  );
+  return <Navigate to="/project-manager/dashboard" replace />;
 }

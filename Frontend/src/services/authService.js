@@ -57,6 +57,20 @@ export const authService = {
     }
   },
 
+  async updateProfile(data) {
+    try {
+      const response = await api.patch("/api/auth/profile", data);
+      return {
+        success: true,
+        data: response.data?.data,
+        message: response.data?.message || "Profile updated successfully",
+      };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to update profile";
+      return { success: false, error: message };
+    }
+  },
+
   async forgotPassword(email) {
     try {
       const response = await api.post("/api/auth/forgot-password", { email });

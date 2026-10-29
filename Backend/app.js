@@ -12,6 +12,9 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import supervisorRoutes from "./routes/supervisorRoutes.js";
 import accountantRoutes from "./routes/accountantRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import preferencesRoutes from "./routes/preferencesRoutes.js";
+import projectManagerRoutes from "./routes/project-manager/projectManagerRoutes.js";
+import siteEngineerRoutes from "./routes/site-engineer/siteEngineerRoutes.js";
 
 const app = express();
 
@@ -20,13 +23,13 @@ app.use(
   cors({
     origin: true,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // Log requests in development
 if (process.env.NODE_ENV !== "production") {
@@ -98,6 +101,16 @@ app.use("/api/ai", aiRoutes);
 
 // Real-time notifications routes
 app.use("/api/notifications", notificationRoutes);
+// Project Manager routes (supporting standard and v1 endpoints)
+app.use("/api/project-manager", projectManagerRoutes);
+app.use("/api/v1/project-manager", projectManagerRoutes);
+
+// Site Engineer routes (supporting standard and v1 endpoints)
+app.use("/api/site-engineer", siteEngineerRoutes);
+app.use("/api/v1/site-engineer", siteEngineerRoutes);
+
+// User preferences routes
+app.use("/api/preferences", preferencesRoutes);
 
 // Handle unknown routes
 app.use((req, res) => {

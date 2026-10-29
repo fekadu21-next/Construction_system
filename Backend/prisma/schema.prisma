@@ -773,6 +773,7 @@ enum TaskStatus {
   IN_PROGRESS
   COMPLETED
   BLOCKED
+  CANCELLED
 }
 
 enum TaskPriority {
@@ -800,6 +801,7 @@ enum RequestUrgency {
   NORMAL
   HIGH
   CRITICAL
+  EMERGENCY
 }
 
 enum MaterialRequestStatus {
@@ -807,6 +809,7 @@ enum MaterialRequestStatus {
   APPROVED
   REJECTED
   FULFILLED
+  CANCELLED
 }
 
 enum MovementType {

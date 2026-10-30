@@ -28,6 +28,15 @@ export const accountantApi = {
     }
   },
 
+  async updateProjectBudget(projectId, data) {
+    try {
+      const response = await api.patch(`/api/accountant/budgets/project/${projectId}`, data);
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || "Failed to update project allocated budget" };
+    }
+  },
+
   async getExpenses(params = {}) {
     try {
       const response = await api.get("/api/accountant/expenses", { params });
@@ -106,6 +115,24 @@ export const accountantApi = {
       return { success: true, data: response.data.data };
     } catch (err) {
       return { success: false, error: err.response?.data?.message || "Failed to execute invoice payment" };
+    }
+  },
+
+  async getMaterialCosts(projectId) {
+    try {
+      const response = await api.get("/api/accountant/material-costs", { params: { projectId } });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || "Failed to load material costs" };
+    }
+  },
+
+  async recordMaterialCost(data) {
+    try {
+      const response = await api.post("/api/accountant/material-costs/record", data);
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || "Failed to record material cost" };
     }
   },
 

@@ -154,10 +154,16 @@ export const hrController = {
           message: error.message,
         });
       }
+      if (error.message?.includes("numeric field overflow") || error.code === "22003") {
+        return res.status(400).json({
+          success: false,
+          message: "Daily wage rate or monthly salary exceeds the allowed system limit.",
+        });
+      }
       console.error("Create employee error:", error);
       res.status(500).json({
         success: false,
-        message: "Unable to register employee",
+        message: error.message || "Unable to register employee",
       });
     }
   },
@@ -607,6 +613,124 @@ export const hrController = {
       });
     } catch (error) {
       next(error);
+    }
+  },
+
+  async getOverview(req, res, next) {
+    try {
+      const overview = await hrService.getComprehensiveHROverview(req.query.date);
+      res.json({
+        success: true,
+        data: overview,
+      });
+    } catch (error) {
+      console.error("Get HR overview error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to load HR overview dashboard",
+      });
+    }
+  },
+
+  async getTemporaryRequests(req, res, next) {
+    try {
+      const result = await hrService.getTemporaryWorkerRequests(req.query);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error("Get temporary requests error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to load temporary worker requests",
+      });
+    }
+  },
+
+  async returnTemporaryRequest(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const actorId = req.userId;
+      const returned = await hrService.returnTemporaryWorkerRequest(id, reason, actorId);
+      res.json({
+        success: true,
+        data: returned,
+        message: "Temporary worker request returned for more information",
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Failed to return temporary request",
+      });
+    }
+  },
+
+  async getAssignments(req, res, next) {
+    try {
+      const result = await hrService.getProjectAssignmentsList(req.query);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error("Get assignments error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to load project assignments",
+      });
+    }
+  },
+
+  async endAssignment(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { actualEndDate, reason } = req.body;
+      const actorId = req.userId;
+      const completed = await hrService.endProjectAssignment(id, { actualEndDate, reason }, actorId);
+      res.json({
+        success: true,
+        data: completed,
+        message: "Assignment completed successfully",
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Failed to end assignment",
+      });
+    }
+  },
+
+  async getAvailability(req, res, next) {
+    try {
+      const result = await hrService.getWorkforceAvailability(req.query);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error("Get workforce availability error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to load workforce availability",
+      });
+    }
+  },
+
+  async reportAttendanceIssue(req, res, next) {
+    try {
+      const result = await hrService.reportAttendanceIssue(req.body, req.userId);
+      res.json({
+        success: true,
+        data: result,
+        message: "Attendance issue reported to site supervisor for review",
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || "Failed to report attendance issue",
+      });
     }
   },
 };

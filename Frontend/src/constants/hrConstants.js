@@ -1,4 +1,4 @@
-export const WORKER_TRADES = [
+export const SYSTEM_USER_ROLES = [
   { value: "GENERAL_MANAGER", label: "General Manager" },
   { value: "PROJECT_MANAGER", label: "Project Manager" },
   { value: "HR_MANAGER", label: "HR Manager" },
@@ -6,6 +6,9 @@ export const WORKER_TRADES = [
   { value: "ACCOUNTANT", label: "Accountant" },
   { value: "PROCUREMENT_OFFICER", label: "Procurement Officer" },
   { value: "SUPERVISOR", label: "Supervisor" },
+];
+
+export const WORKER_TRADES = [
   { value: "FOREMAN", label: "Foreman" },
   { value: "SURVEYOR", label: "Surveyor" },
   { value: "SAFETY_OFFICER", label: "Safety Officer" },

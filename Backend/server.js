@@ -4,8 +4,13 @@ import { connectDB } from "./config/db.js";
 
 async function startServer() {
   try {
-    // Verify database connectivity first.
-    await connectDB();
+    // Attempt initial database connectivity without hard-crashing nodemon on transient network hiccups
+    try {
+      await connectDB();
+    } catch (dbErr) {
+      console.warn("⚠️ Initial database connection warning:", dbErr.message);
+      console.warn("Server will continue running; database connectivity will be established on subsequent requests.");
+    }
 
     const server = app.listen(env.PORT, () => {
       console.log("------------------------------------");
@@ -27,4 +32,3 @@ async function startServer() {
 }
 
 startServer();
-// Active server

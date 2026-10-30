@@ -53,6 +53,15 @@ export const supervisorController = {
     }
   },
 
+  async getAttendanceHistory(req, res, next) {
+    try {
+      const data = await supervisorService.getAttendanceHistory(req.query, req.userId, req.userRole);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async saveAttendance(req, res, next) {
     try {
       if (["HR_MANAGER", "ACCOUNTANT"].includes(req.userRole)) {

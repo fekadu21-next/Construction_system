@@ -40,18 +40,18 @@ export default function HRManagerLayout() {
   };
 
   const navItems = [
-    { label: t("overview") || "Overview", path: "/hr/dashboard", icon: "📊" },
-    { label: t("workforceRoster") || "Workforce Roster", path: "/hr/employees", icon: "👷" },
-    { label: t("dailyAttendance") || "Daily Attendance", path: "/hr/attendance", icon: "⏱️" },
-    { label: t("leaveRequests") || "Leave Requests", path: "/hr/leaves", icon: "🏖️" },
-    { label: t("laborAndPayroll") || "Labor & Payroll", path: "/hr/payroll", icon: "💵" },
-    { label: t("notifications") || "Notifications", path: "/hr/notifications", icon: "🔔", badge: unreadCount },
-    { label: t("settings") || "Settings", path: "/hr/settings", icon: "⚙️" },
-    { label: t("profile") || "My Profile", path: "/hr/profile", icon: "👤" },
+    { label: "Overview", path: "/hr/dashboard", icon: "📊" },
+    { label: "Workers", path: "/hr/workers", icon: "👷" },
+    { label: "Temporary Worker Approvals", path: "/hr/approvals", icon: "📋" },
+    { label: "Project & Site Assignments", path: "/hr/assignments", icon: "🏗️" },
+    { label: "Attendance", path: "/hr/attendance", icon: "⏱️" },
+    { label: "Workforce Availability", path: "/hr/availability", icon: "👥" },
+    { label: "Profile", path: "/hr/profile", icon: "👤" },
+    { label: "Settings", path: "/hr/settings", icon: "⚙️" },
   ];
 
   return (
-    <div className={`min-h-screen flex ${isDark ? "bg-[#0b1329] text-slate-100" : "bg-slate-50 text-slate-900"} transition-colors duration-200`}>
+    <div className={`h-screen overflow-hidden flex ${isDark ? "bg-[#0b1329] text-slate-100" : "bg-slate-50 text-slate-900"} transition-colors duration-200`}>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -60,16 +60,16 @@ export default function HRManagerLayout() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Static / Fixed Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col border-r transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shrink-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 h-full min-h-0 shrink-0 flex flex-col border-r transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
           isDark
             ? "bg-[#0f172a] border-slate-800 text-slate-200"
             : "bg-white border-slate-200 text-slate-700 shadow-sm"
         } ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Brand Header */}
-        <div className={`h-16 flex items-center justify-between px-6 border-b ${isDark ? "border-slate-800" : "border-slate-100"}`}>
+        <div className={`h-16 flex items-center justify-between px-6 border-b shrink-0 ${isDark ? "border-slate-800" : "border-slate-100"}`}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
               🏗️
@@ -101,7 +101,7 @@ export default function HRManagerLayout() {
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 overflow-y-auto px-4 py-5 space-y-1.5">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-5 space-y-1.5 custom-scrollbar">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 pb-2">
             {t("workforceManagement") || "Workforce Management"}
           </div>
@@ -136,7 +136,7 @@ export default function HRManagerLayout() {
         </nav>
 
         {/* User Card Footer */}
-        <div className={`p-4 border-t ${isDark ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-slate-50/50"}`}>
+        <div className={`p-4 border-t shrink-0 ${isDark ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-slate-50/50"}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm">
               {user?.fullName?.charAt(0).toUpperCase() || "H"}
@@ -157,10 +157,10 @@ export default function HRManagerLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Top Navbar */}
         <header
-          className={`sticky top-0 z-30 h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between border-b transition-colors duration-200 ${
+          className={`sticky top-0 z-30 h-16 shrink-0 px-4 sm:px-6 lg:px-8 flex items-center justify-between border-b transition-colors duration-200 ${
             isDark
               ? "bg-[#0b1329]/90 border-slate-800 backdrop-blur-md"
               : "bg-white/95 border-slate-200 backdrop-blur-md shadow-xs"
@@ -365,7 +365,7 @@ export default function HRManagerLayout() {
         </header>
 
         {/* Main Body */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 min-h-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <Outlet />
         </main>
       </div>

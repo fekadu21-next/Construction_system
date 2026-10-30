@@ -9,10 +9,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
 
 // Dashboards
-import ProjectManagerDashboard from "./pages/ProjectManagerDashboard.jsx";
-import SiteEngineerDashboard from "./pages/SiteEngineerDashboard.jsx";
 import ProcurementDashboard from "./pages/ProcurementDashboard.jsx";
-import AccountantDashboard from "./pages/AccountantDashboard.jsx";
 
 // General Manager
 import GeneralManagerLayout from "./layouts/GeneralManagerLayout.jsx";
@@ -33,7 +30,10 @@ import { USER_ROLES, getDashboardRoute } from "./constants/roles.js";
 import HRManagerLayout from "./layouts/HRManagerLayout.jsx";
 import HRDashboardPage from "./pages/hr/HRDashboardPage.jsx";
 import EmployeesPage from "./pages/hr/EmployeesPage.jsx";
+import TemporaryApprovalsPage from "./pages/hr/TemporaryApprovalsPage.jsx";
+import AssignmentsPage from "./pages/hr/AssignmentsPage.jsx";
 import AttendancePage from "./pages/hr/AttendancePage.jsx";
+import WorkforceAvailabilityPage from "./pages/hr/WorkforceAvailabilityPage.jsx";
 import LeaveRequestsPage from "./pages/hr/LeaveRequestsPage.jsx";
 import PayrollPage from "./pages/hr/PayrollPage.jsx";
 import HRProfilePage from "./pages/hr/HRProfilePage.jsx";
@@ -43,6 +43,7 @@ import HRSettingsPage from "./pages/hr/HRSettingsPage.jsx";
 // Site Supervisor Module
 import SupervisorLayout from "./layouts/SupervisorLayout.jsx";
 import SupervisorDashboardPage from "./pages/supervisor/SupervisorDashboardPage.jsx";
+import SupervisorWorkersPage from "./pages/supervisor/SupervisorWorkersPage.jsx";
 import SupervisorAttendancePage from "./pages/supervisor/SupervisorAttendancePage.jsx";
 import SupervisorTasksPage from "./pages/supervisor/SupervisorTasksPage.jsx";
 import SupervisorMaterialsPage from "./pages/supervisor/SupervisorMaterialsPage.jsx";
@@ -57,8 +58,10 @@ import AccountantBudgetsPage from "./pages/accountant/AccountantBudgetsPage.jsx"
 import AccountantExpensesPage from "./pages/accountant/AccountantExpensesPage.jsx";
 import AccountantLaborCostsPage from "./pages/accountant/AccountantLaborCostsPage.jsx";
 import AccountantInvoicesPage from "./pages/accountant/AccountantInvoicesPage.jsx";
+import AccountantMaterialCostsPage from "./pages/accountant/AccountantMaterialCostsPage.jsx";
 import AccountantReportsPage from "./pages/accountant/AccountantReportsPage.jsx";
 import AccountantProfilePage from "./pages/accountant/AccountantProfilePage.jsx";
+import AccountantSettingsPage from "./pages/accountant/AccountantSettingsPage.jsx";
 // Project Manager
 import ProjectManagerLayout from "./layouts/ProjectManagerLayout.jsx";
 import PMDashboardPage from "./pages/project-manager/DashboardPage.jsx";
@@ -87,10 +90,6 @@ import SEProgressReportsPage from "./pages/site-engineer/ProgressReportsPage.jsx
 import SEMaterialRequestsPage from "./pages/site-engineer/MaterialRequestsPage.jsx";
 import SENotificationsPage from "./pages/site-engineer/NotificationsPage.jsx";
 import SEProfilePage from "./pages/site-engineer/ProfilePage.jsx";
-
-import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute.jsx";
-import { useAuth } from "./contexts/AuthContext.jsx";
-import { USER_ROLES, getDashboardRoute } from "./constants/roles.js";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -141,8 +140,13 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<HRDashboardPage />} />
+        <Route path="workers" element={<EmployeesPage />} />
         <Route path="employees" element={<EmployeesPage />} />
+        <Route path="approvals" element={<TemporaryApprovalsPage />} />
+        <Route path="temporary-requests" element={<TemporaryApprovalsPage />} />
+        <Route path="assignments" element={<AssignmentsPage />} />
         <Route path="attendance" element={<AttendancePage />} />
+        <Route path="availability" element={<WorkforceAvailabilityPage />} />
         <Route path="leaves" element={<LeaveRequestsPage />} />
         <Route path="payroll" element={<PayrollPage />} />
         <Route path="notifications" element={<HRNotificationsPage />} />
@@ -161,6 +165,8 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<SupervisorDashboardPage />} />
+        <Route path="workers" element={<SupervisorWorkersPage />} />
+        <Route path="register-workers" element={<SupervisorWorkersPage />} />
         <Route path="attendance" element={<SupervisorAttendancePage />} />
         <Route path="tasks" element={<SupervisorTasksPage />} />
         <Route path="materials" element={<SupervisorMaterialsPage />} />
@@ -184,13 +190,12 @@ function AppRoutes() {
         <Route path="expenses" element={<AccountantExpensesPage />} />
         <Route path="labor-costs" element={<AccountantLaborCostsPage />} />
         <Route path="invoices" element={<AccountantInvoicesPage />} />
+        <Route path="material-costs" element={<AccountantMaterialCostsPage />} />
         <Route path="reports" element={<AccountantReportsPage />} />
         <Route path="profile" element={<AccountantProfilePage />} />
+        <Route path="settings" element={<AccountantSettingsPage />} />
       </Route>
 
-      {/* Other Role Dashboards */}
-      <Route path="/project-manager/dashboard" element={<ProjectManagerDashboard />} />
-      <Route path="/site-engineer/dashboard" element={<SiteEngineerDashboard />} />
       {/* Project Manager Routes */}
       <Route path="/project-manager" element={<ProjectManagerLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
@@ -211,8 +216,6 @@ function AppRoutes() {
         <Route path="settings" element={<PMSettingsPage />} />
       </Route>
 
-      {/* Other Role Dashboards */}
-      <Route path="/hr/dashboard" element={<HRManagerDashboard />} />
       {/* Site Engineer Routes */}
       <Route
         path="/site-engineer"

@@ -1,4 +1,4 @@
-﻿import prisma from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import pool from "../../config/db.js";
 import { notificationService } from "../notificationService.js";
 
@@ -312,7 +312,7 @@ export const supervisorService = {
     const trade = (data.trade || "GENERAL_LABORER").trim().toUpperCase();
     const workTeam = (data.workTeam || "Site Daily Crew").trim();
     const dailyRate = data.dailyRate !== undefined && data.dailyRate !== null && data.dailyRate !== "" 
-      ? Number(data.dailyRate) 
+      ? Math.min(Math.max(0, Number(data.dailyRate) || 0), 99999999.99)
       : null;
 
     const worker = await prisma.employee.create({
@@ -865,6 +865,8 @@ export const supervisorService = {
         throw new Error(`Attendance for ${empId} on ${date} is already APPROVED and cannot be modified directly. Request a correction instead.`);
       }
 
+      const targetStatus = (existing && existing.approvalStatus === "APPROVED") ? "APPROVED" : "SUBMITTED";
+
       await prisma.attendance.upsert({
         where: {
           employeeId_date: {
@@ -882,7 +884,8 @@ export const supervisorService = {
           notes: r.notes || null,
           team: r.workTeam || null,
           recordedById: actorId,
-          approvalStatus: "DRAFT",
+          approvalStatus: targetStatus,
+          submittedAt: new Date(),
         },
         create: {
           employeeId: empId,
@@ -896,7 +899,8 @@ export const supervisorService = {
           notes: r.notes || null,
           team: r.workTeam || null,
           recordedById: actorId,
-          approvalStatus: "DRAFT",
+          approvalStatus: targetStatus,
+          submittedAt: new Date(),
         },
       });
     }
@@ -905,7 +909,7 @@ export const supervisorService = {
       await prisma.auditLog.create({
         data: {
           actorUserId: actorId,
-          action: "SAVE_SITE_ATTENDANCE_DRAFT",
+          action: "SAVE_SITE_ATTENDANCE",
           entityType: "Attendance",
           details: { projectId, date, recordsCount: records.length },
         },
@@ -914,11 +918,214 @@ export const supervisorService = {
       console.warn("Audit log warning:", e.message);
     }
 
+    // Immediately notify HR and Accountant that attendance is recorded in DB
+    try {
+      await notificationService.createNotification({
+        recipientRole: "HR_MANAGER",
+        title: "Daily Attendance Recorded",
+        message: `Site attendance for ${records.length} worker(s) saved to DB for project "${project.projectName}" on ${date}.`,
+        type: "INFO",
+        category: "ATTENDANCE",
+        link: `/hr/attendance?projectId=${projectId}&date=${date}`,
+      });
+      await notificationService.createNotification({
+        recipientRole: "ACCOUNTANT",
+        title: "Daily Labor Attendance Saved",
+        message: `Site attendance saved in DB for project "${project.projectName}" (${records.length} workers) on ${date}. Ready for wage & cost review.`,
+        type: "INFO",
+        category: "LABOR_COSTS",
+        link: `/accountant/labor-costs?projectId=${projectId}&date=${date}`,
+      });
+    } catch (notifErr) {
+      console.warn("Notification error:", notifErr.message);
+    }
+
     return {
       success: true,
-      message: `Saved attendance draft for ${records.length} workers`,
+      message: `Saved attendance table for ${records.length} workers to database`,
       date,
       count: records.length,
+    };
+  },
+
+  /**
+   * Get historical attendance logs for supervisor's assigned project
+   */
+  async getAttendanceHistory(query, userId, userRole) {
+    const {
+      projectId,
+      page = 1,
+      limit = 20,
+      search = "",
+      startDate = "",
+      endDate = "",
+      status = "ALL",
+      trade = "ALL",
+    } = query || {};
+
+    const isManager = ["GENERAL_MANAGER", "ADMIN", "HR_MANAGER", "ACCOUNTANT"].includes(userRole);
+
+    let targetProjectId = projectId;
+    if (!targetProjectId || targetProjectId === "all") {
+      if (!isManager) {
+        const assignedProj = await prisma.project.findFirst({
+          where: { supervisorId: userId, archivedAt: null },
+          select: { id: true },
+        });
+        targetProjectId = assignedProj?.id;
+      }
+    } else if (!isManager) {
+      const proj = await prisma.project.findUnique({
+        where: { id: targetProjectId },
+        select: { supervisorId: true },
+      });
+      if (proj && proj.supervisorId !== userId) {
+        throw new Error("You are not authorized to view attendance history for this project");
+      }
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {};
+    if (targetProjectId && targetProjectId !== "all") {
+      where.projectId = targetProjectId;
+    }
+    if (status && status !== "ALL") {
+      where.status = status;
+    }
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) where.date.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        where.date.lte = end;
+      }
+    }
+
+    where.employee = {
+      trade: { notIn: ["SUPERVISOR", "SUPERVISER"] },
+    };
+
+    if (trade && trade !== "ALL") {
+      where.employee.trade = trade;
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.employee.OR = [
+        { fullName: { contains: q, mode: "insensitive" } },
+        { employeeCode: { contains: q, mode: "insensitive" } },
+        { phone: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    const [records, total, allSummaryLogs] = await Promise.all([
+      prisma.attendance.findMany({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: { date: "desc" },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              employeeCode: true,
+              fullName: true,
+              trade: true,
+              phone: true,
+              dailyRate: true,
+              employmentType: true,
+              workTeam: true,
+            },
+          },
+          project: {
+            select: {
+              id: true,
+              projectName: true,
+              projectCode: true,
+            },
+          },
+        },
+      }),
+      prisma.attendance.count({ where }),
+      prisma.attendance.findMany({
+        where,
+        select: {
+          status: true,
+          workHours: true,
+          overtimeHours: true,
+          employee: { select: { dailyRate: true } },
+        },
+      }),
+    ]);
+
+    let totalWorkHours = 0;
+    let totalOvertimeHours = 0;
+    let totalEstimatedWages = 0;
+    let presentCount = 0;
+    let absentCount = 0;
+    let onLeaveCount = 0;
+
+    allSummaryLogs.forEach((log) => {
+      const hrs = Number(log.workHours) || 0;
+      const ot = Number(log.overtimeHours) || 0;
+      totalWorkHours += hrs;
+      totalOvertimeHours += ot;
+
+      if (log.status === "PRESENT" || log.status === "LATE") presentCount++;
+      else if (log.status === "ABSENT") absentCount++;
+      else if (log.status === "ON_LEAVE") onLeaveCount++;
+
+      const wage = calculateWorkerWage(log.employee?.dailyRate, 0, log.status, ot);
+      totalEstimatedWages += wage.totalCost;
+    });
+
+    const formatted = records.map((r) => {
+      const wage = calculateWorkerWage(r.employee?.dailyRate, 0, r.status, r.overtimeHours);
+      return {
+        id: r.id,
+        date: r.date.toISOString().split("T")[0],
+        employeeId: r.employee?.id,
+        employeeCode: r.employee?.employeeCode || "N/A",
+        fullName: r.employee?.fullName || "Worker",
+        trade: r.employee?.trade || "GENERAL_LABORER",
+        phone: r.employee?.phone || "",
+        workTeam: r.team || r.employee?.workTeam || "Main Team",
+        status: r.status,
+        checkInTime: r.checkInTime || "--",
+        checkOutTime: r.checkOutTime || "--",
+        workHours: Number(r.workHours) || 0,
+        overtimeHours: Number(r.overtimeHours) || 0,
+        dailyRate: Number(r.employee?.dailyRate) || 0,
+        earnedWage: wage.totalCost,
+        approvalStatus: r.approvalStatus,
+        notes: r.notes || "",
+        projectId: r.projectId,
+        projectName: r.project?.projectName || "Assigned Project",
+        projectCode: r.project?.projectCode || "",
+      };
+    });
+
+    return {
+      records: formatted,
+      summary: {
+        totalRecords: total,
+        totalWorkHours: Math.round(totalWorkHours * 10) / 10,
+        totalOvertimeHours: Math.round(totalOvertimeHours * 10) / 10,
+        totalEstimatedWages: Math.round(totalEstimatedWages * 100) / 100,
+        presentCount,
+        absentCount,
+        onLeaveCount,
+      },
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 1,
+      },
     };
   },
 

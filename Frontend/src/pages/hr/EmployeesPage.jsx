@@ -1,8 +1,55 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { hrApi } from "../../services/hrApi.js";
+import { usersApi } from "../../services/usersApi.js";
 import { WORKER_TRADES, EMPLOYMENT_TYPES, EMPLOYEE_STATUSES } from "../../constants/hrConstants.js";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
+
+// The 6 administrative/management system roles
+export const SIX_SYSTEM_ROLES = [
+  {
+    role: "SUPERVISOR",
+    label: "Supervisor",
+    description: "Supervises site workforce and daily construction activities",
+    icon: "👷‍♂️",
+    badge: "bg-teal-500/10 text-teal-400 border-teal-500/30",
+  },
+  {
+    role: "HR_MANAGER",
+    label: "HR Manager",
+    description: "Handles workforce onboarding, labor allocations, and personnel records",
+    icon: "📋",
+    badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  },
+  {
+    role: "ACCOUNTANT",
+    label: "Accountant",
+    description: "Tracks project financial ledgers, disbursements, invoicing, and labor costs",
+    icon: "💰",
+    badge: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
+  },
+  {
+    role: "PROJECT_MANAGER",
+    label: "Project Manager",
+    description: "Manages assigned construction projects, timelines, tasks, and site deliverables",
+    icon: "🏗️",
+    badge: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  },
+  {
+    role: "SITE_ENGINEER",
+    label: "Site Engineer",
+    description: "Monitors daily site operations, physical progress, and technical specifications",
+    icon: "📐",
+    badge: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+  },
+  {
+    role: "PROCUREMENT_OFFICER",
+    label: "Procurement Officer",
+    description: "Manages vendors, purchase orders, materials acquisition, and deliveries",
+    icon: "📦",
+    badge: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+  },
+];
 
 export default function EmployeesPage() {
   const { isDark } = useTheme();
@@ -76,6 +123,21 @@ export default function EmployeesPage() {
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [assignError, setAssignError] = useState("");
 
+  // Form State for Add System User (Only 6 Administrative Roles)
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [userFormData, setUserFormData] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    role: "SUPERVISOR",
+    assignedProjectId: "",
+    password: "",
+    mustChangePassword: true,
+    isActive: true,
+  });
+  const [userFormSubmitting, setUserFormSubmitting] = useState(false);
+  const [userFormError, setUserFormError] = useState("");
+
   useEffect(() => {
     fetchProjects();
   }, []);
@@ -119,6 +181,68 @@ export default function EmployeesPage() {
       setError("Failed to fetch employees");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openAddUserModal = () => {
+    setUserFormData({
+      fullName: "",
+      email: "",
+      phone: "",
+      role: "SUPERVISOR",
+      assignedProjectId: projects[0]?.id || "",
+      password: "",
+      mustChangePassword: true,
+      isActive: true,
+    });
+    setUserFormError("");
+    setShowAddUserModal(true);
+  };
+
+  const handleCreateUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!userFormData.fullName.trim()) {
+      setUserFormError("Full name is required");
+      return;
+    }
+    if (!userFormData.email.trim()) {
+      setUserFormError("Email address is required");
+      return;
+    }
+    if (!userFormData.role) {
+      setUserFormError("Please select one of the 6 administrative roles");
+      return;
+    }
+
+    setUserFormSubmitting(true);
+    setUserFormError("");
+
+    try {
+      const res = await usersApi.createUser({
+        fullName: userFormData.fullName.trim(),
+        email: userFormData.email.trim(),
+        phone: userFormData.phone && userFormData.phone.trim() ? userFormData.phone.trim() : null,
+        role: userFormData.role,
+        assignedProjectId: userFormData.assignedProjectId || undefined,
+        password: userFormData.password?.trim() || undefined,
+        mustChangePassword: userFormData.mustChangePassword,
+        isActive: userFormData.isActive,
+      });
+
+      if (res.success) {
+        const selectedRoleConfig = SIX_SYSTEM_ROLES.find((r) => r.role === userFormData.role);
+        setSuccess(
+          `✓ System user "${userFormData.fullName}" (${selectedRoleConfig?.label || userFormData.role}) created successfully! Account granted system login access and synced to workforce roster.`
+        );
+        setShowAddUserModal(false);
+        fetchEmployees();
+      } else {
+        setUserFormError(res.error || "Failed to create user account");
+      }
+    } catch (err) {
+      setUserFormError(err.message || "Failed to create user account");
+    } finally {
+      setUserFormSubmitting(false);
     }
   };
 
@@ -394,6 +518,13 @@ export default function EmployeesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={openAddUserModal}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <span>👤➕</span> Add User
+          </button>
           <button
             type="button"
             onClick={openAddModal}
@@ -776,6 +907,11 @@ export default function EmployeesPage() {
                     className={`w-full px-3.5 py-2 rounded-xl text-sm border focus:ring-2 focus:ring-emerald-500 ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"
                       }`}
                   >
+                    {formData.trade && !WORKER_TRADES.some((t) => t.value === formData.trade) && (
+                      <option value={formData.trade}>
+                        {formData.trade.replace(/_/g, " ")}
+                      </option>
+                    )}
                     {WORKER_TRADES.map((t) => (
                       <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
@@ -815,6 +951,8 @@ export default function EmployeesPage() {
                   <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Daily Wage Rate (ETB)</label>
                   <input
                     type="number"
+                    min="0"
+                    max="99999999"
                     step="0.01"
                     value={formData.dailyRate}
                     onChange={(e) => setFormData({ ...formData, dailyRate: e.target.value })}
@@ -828,6 +966,8 @@ export default function EmployeesPage() {
                   <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Monthly Salary (ETB)</label>
                   <input
                     type="number"
+                    min="0"
+                    max="99999999"
                     step="0.01"
                     value={formData.monthlySalary}
                     onChange={(e) => setFormData({ ...formData, monthlySalary: e.target.value })}
@@ -1211,6 +1351,12 @@ export default function EmployeesPage() {
                   </button>
                 </>
               )}
+              <a
+                href={`/hr/attendance?search=${encodeURIComponent(viewingEmployee.employeeCode)}`}
+                className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer text-center"
+              >
+                📜 Attendance History
+              </a>
               <button
                 onClick={() => {
                   const emp = viewingEmployee;
@@ -1285,6 +1431,276 @@ export default function EmployeesPage() {
                 Confirm Rejection
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADD SYSTEM USER MODAL (Strictly 6 Administrative / Management Roles)       */}
+      {/* ========================================================================= */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden max-h-[92vh] flex flex-col ${
+            isDark ? "bg-[#0c1830] border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          }`}>
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-blue-600/10 via-indigo-600/5 to-transparent flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/15 border border-blue-500/30 text-blue-500 flex items-center justify-center text-xl shrink-0 font-bold shadow-xs">
+                  👤
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight text-slate-900 dark:text-white">
+                    Add System User
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Create an administrative account with system login access (6 authorized roles).
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddUserModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleCreateUserSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+              {userFormError && (
+                <div className="p-3.5 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300">
+                  ⚠️ {userFormError}
+                </div>
+              )}
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Abebe Bikila"
+                  value={userFormData.fullName}
+                  onChange={(e) => setUserFormData({ ...userFormData, fullName: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-hidden transition-all focus:ring-2 focus:ring-blue-500 ${
+                    isDark
+                      ? "bg-slate-800/60 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800"
+                      : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white"
+                  }`}
+                />
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. abebe.b@company.com"
+                  value={userFormData.email}
+                  onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-hidden transition-all focus:ring-2 focus:ring-blue-500 ${
+                    isDark
+                      ? "bg-slate-800/60 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800"
+                      : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white"
+                  }`}
+                />
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 block">
+                  Used as username for logging into the portal.
+                </span>
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="+251 911 000000"
+                  value={userFormData.phone}
+                  onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-hidden transition-all focus:ring-2 focus:ring-blue-500 ${
+                    isDark
+                      ? "bg-slate-800/60 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800"
+                      : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white"
+                  }`}
+                />
+              </div>
+
+              {/* System Role Selector - Exactly 6 Roles */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                    Administrative System Role <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] font-semibold text-blue-500 dark:text-blue-400">
+                    6 Roles Available
+                  </span>
+                </div>
+                <select
+                  required
+                  value={userFormData.role}
+                  onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-hidden font-semibold transition-all focus:ring-2 focus:ring-blue-500 cursor-pointer ${
+                    isDark
+                      ? "bg-slate-800 border-slate-700 text-white focus:bg-slate-800"
+                      : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"
+                  }`}
+                >
+                  {SIX_SYSTEM_ROLES.map((r) => (
+                    <option key={r.role} value={r.role} className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                      {r.icon} {r.label}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Role Description Card Preview */}
+                {(() => {
+                  const currentRoleConfig = SIX_SYSTEM_ROLES.find((r) => r.role === userFormData.role) || SIX_SYSTEM_ROLES[0];
+                  return (
+                    <div className="mt-2.5 p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 flex items-start gap-3">
+                      <span className="text-xl shrink-0 mt-0.5">{currentRoleConfig.icon}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            {currentRoleConfig.label}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentRoleConfig.badge}`}>
+                            {currentRoleConfig.role}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                          {currentRoleConfig.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Assigned Project Site */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                  Assigned Project Site
+                </label>
+                <select
+                  value={userFormData.assignedProjectId}
+                  onChange={(e) => setUserFormData({ ...userFormData, assignedProjectId: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-hidden transition-all focus:ring-2 focus:ring-blue-500 cursor-pointer ${
+                    isDark
+                      ? "bg-slate-800 border-slate-700 text-white focus:bg-slate-800"
+                      : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"
+                  }`}
+                >
+                  <option value="">-- No Initial Project (Unassigned) --</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id} className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                      🏗️ {p.projectName} ({p.projectCode})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 block">
+                  Select a construction project site to deploy this user to upon account creation.
+                </span>
+              </div>
+
+              {/* Password Option */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                  Initial Password
+                </label>
+                <input
+                  type="password"
+                  placeholder="Defaults to Welcome@123456 if left blank"
+                  value={userFormData.password}
+                  onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-hidden transition-all focus:ring-2 focus:ring-blue-500 ${
+                    isDark
+                      ? "bg-slate-800/60 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800"
+                      : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white"
+                  }`}
+                />
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 block">
+                  Leave blank to set the standard default temporary password (<code className="font-mono text-blue-400">Welcome@123456</code>).
+                </span>
+              </div>
+
+              {/* Checkbox Options */}
+              <div className="space-y-2 pt-1">
+                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  isDark ? "border-slate-800 bg-slate-800/30 hover:bg-slate-800/50" : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/60"
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={userFormData.isActive}
+                    onChange={(e) => setUserFormData({ ...userFormData, isActive: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded-md border-slate-300 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Account Status: Active
+                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Enabled immediately for system portal login upon creation.
+                    </p>
+                  </div>
+                </label>
+
+                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  isDark ? "border-slate-800 bg-slate-800/30 hover:bg-slate-800/50" : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/60"
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={userFormData.mustChangePassword}
+                    onChange={(e) => setUserFormData({ ...userFormData, mustChangePassword: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded-md border-slate-300 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Require password change on first login
+                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Forces the staff member to choose a private password upon first sign-in.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={userFormSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/30 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {userFormSubmitting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Creating User...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>👤</span>
+                      <span>Create User</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -51,6 +51,13 @@ export const validateCreateEmployee = (req, res, next) => {
         field: "dailyRate",
       });
     }
+    if (rate >= 100000000) {
+      return res.status(400).json({
+        success: false,
+        message: "Daily rate cannot exceed 99,999,999.99 ETB",
+        field: "dailyRate",
+      });
+    }
   }
 
   if (monthlySalary !== undefined && monthlySalary !== null && monthlySalary !== "") {
@@ -59,6 +66,13 @@ export const validateCreateEmployee = (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: "Monthly salary must be a non-negative number",
+        field: "monthlySalary",
+      });
+    }
+    if (salary >= 100000000) {
+      return res.status(400).json({
+        success: false,
+        message: "Monthly salary cannot exceed 99,999,999.99 ETB",
         field: "monthlySalary",
       });
     }
@@ -137,6 +151,13 @@ export const validateUpdateEmployee = (req, res, next) => {
         field: "dailyRate",
       });
     }
+    if (rate >= 100000000) {
+      return res.status(400).json({
+        success: false,
+        message: "Daily rate cannot exceed 99,999,999.99 ETB",
+        field: "dailyRate",
+      });
+    }
   }
 
   if (monthlySalary !== undefined && monthlySalary !== null && monthlySalary !== "") {
@@ -145,6 +166,13 @@ export const validateUpdateEmployee = (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: "Monthly salary must be a non-negative number",
+        field: "monthlySalary",
+      });
+    }
+    if (salary >= 100000000) {
+      return res.status(400).json({
+        success: false,
+        message: "Monthly salary cannot exceed 99,999,999.99 ETB",
         field: "monthlySalary",
       });
     }

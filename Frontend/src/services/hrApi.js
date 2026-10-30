@@ -294,4 +294,74 @@ export const hrApi = {
       return { success: false, error: message };
     }
   },
+
+  async getOverview(params = {}) {
+    try {
+      const response = await api.get("/api/hr/overview", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch HR overview";
+      return { success: false, error: message };
+    }
+  },
+
+  async getTemporaryRequests(params = {}) {
+    try {
+      const response = await api.get("/api/hr/temporary-requests", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch temporary worker requests";
+      return { success: false, error: message };
+    }
+  },
+
+  async returnTemporaryRequest(id, reason) {
+    try {
+      const response = await api.patch(`/api/hr/temporary-requests/${id}/return`, { reason });
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to return temporary request";
+      return { success: false, error: message };
+    }
+  },
+
+  async getAssignments(params = {}) {
+    try {
+      const response = await api.get("/api/hr/assignments", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch project assignments";
+      return { success: false, error: message };
+    }
+  },
+
+  async endAssignment(id, data = {}) {
+    try {
+      const response = await api.patch(`/api/hr/assignments/${id}/end`, data);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to end project assignment";
+      return { success: false, error: message };
+    }
+  },
+
+  async getAvailability(params = {}) {
+    try {
+      const response = await api.get("/api/hr/availability", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to fetch workforce availability";
+      return { success: false, error: message };
+    }
+  },
+
+  async reportAttendanceIssue(data) {
+    try {
+      const response = await api.post("/api/hr/attendance/report-issue", data);
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to report attendance issue";
+      return { success: false, error: message };
+    }
+  },
 };

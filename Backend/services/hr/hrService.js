@@ -1,4 +1,4 @@
-﻿import { hrRepository } from "../../repositories/hrRepository.js";
+import { hrRepository } from "../../repositories/hrRepository.js";
 import prisma from "../../config/prisma.js";
 import { notificationService } from "../notificationService.js";
 import {
@@ -261,10 +261,10 @@ export const hrService = {
         const status = user.isActive ? "ACTIVE" : "INACTIVE";
 
         if (existing) {
-          if (["SUPERVISOR", "SUPERVISER"].includes(userRole) && existing.assignedProjectId) {
+          if (["SUPERVISOR", "SUPERVISER"].includes(userRole) && existing.trade !== "SUPERVISOR") {
             await prisma.employee.update({
               where: { id: existing.id },
-              data: { assignedProjectId: null, trade: "SUPERVISOR" },
+              data: { trade: "SUPERVISOR" },
             });
           }
         } else {
@@ -282,7 +282,7 @@ export const hrService = {
               status,
               hireDate: user.createdAt ? new Date(user.createdAt) : new Date(),
               workTeam: userRole === "SUPERVISOR" ? "Site Management" : "Executive & Staff",
-              assignedProjectId: assignedProjectId || null,
+              assignedProjectId: null,
               currency: "ETB",
             },
           });
@@ -393,6 +393,15 @@ export const hrService = {
       }
     }
 
+    const sanitizeDecimal = (val, max = 99999999.99) => {
+      if (val === undefined || val === null || val === "") return null;
+      const num = Number(val);
+      if (isNaN(num)) return null;
+      if (num < 0) return 0;
+      if (num > max) return max;
+      return Math.round(num * 100) / 100;
+    };
+
     const employee = await hrRepository.createEmployee({
       employeeCode: code,
       fullName: data.fullName.trim(),
@@ -401,8 +410,8 @@ export const hrService = {
       address: data.address ? data.address.trim() : null,
       trade: data.trade,
       employmentType: data.employmentType || "DAILY_LABORER",
-      dailyRate: data.dailyRate ? Number(data.dailyRate) : null,
-      monthlySalary: data.monthlySalary ? Number(data.monthlySalary) : null,
+      dailyRate: sanitizeDecimal(data.dailyRate),
+      monthlySalary: sanitizeDecimal(data.monthlySalary),
       currency: data.currency || "ETB",
       status: data.status || "ACTIVE",
       nationalId: data.nationalId ? data.nationalId.trim() : null,
@@ -510,7 +519,7 @@ export const hrService = {
         updateData.dailyRate = null;
       } else {
         const num = Number(data.dailyRate);
-        updateData.dailyRate = isNaN(num) ? null : num;
+        updateData.dailyRate = isNaN(num) ? null : Math.min(Math.max(0, num), 99999999.99);
       }
     }
 
@@ -519,7 +528,7 @@ export const hrService = {
         updateData.monthlySalary = null;
       } else {
         const num = Number(data.monthlySalary);
-        updateData.monthlySalary = isNaN(num) ? null : num;
+        updateData.monthlySalary = isNaN(num) ? null : Math.min(Math.max(0, num), 99999999.99);
       }
     }
 
@@ -885,9 +894,9 @@ export const hrService = {
   },
 
   async getDailyAttendance(date, projectId) {
-    // 1. Fetch all active site workers (excluding supervisors from attendance roster)
+    // 1. Fetch all site workers including workers pending HR approval (excluding supervisors from attendance roster)
     const empWhere = {
-      status: { in: ["ACTIVE", "ON_LEAVE"] },
+      status: { in: ["ACTIVE", "ON_LEAVE", "PENDING_APPROVAL"] },
       trade: { notIn: ["SUPERVISOR", "SUPERVISER"] },
     };
     if (projectId && projectId !== "all") {
@@ -912,6 +921,8 @@ export const hrService = {
           dailyRate: true,
           monthlySalary: true,
           employmentType: true,
+          status: true,
+          workTeam: true,
           assignedProjectId: true,
           assignedProject: {
             select: {
@@ -964,6 +975,16 @@ export const hrService = {
 
       return {
         id: log ? log.id : null,
+        employeeId: emp.id,
+        employeeCode: emp.employeeCode,
+        fullName: emp.fullName,
+        trade: emp.trade,
+        employmentType: emp.employmentType,
+        employeeStatus: emp.status,
+        projectId: emp.assignedProjectId,
+        projectName: emp.assignedProject?.projectName,
+        projectCode: emp.assignedProject?.projectCode,
+        workTeam: emp.workTeam || "Main Team",
         employee: emp,
         status,
         checkInTime,
@@ -1755,8 +1776,16 @@ export const hrService = {
     };
   },
 
-  async getHRMetrics() {
-    return hrRepository.getMetrics();
+  async getHRMetrics(targetDate) {
+    const [legacy, comprehensive] = await Promise.all([
+      hrRepository.getMetrics(),
+      this.getComprehensiveHROverview(targetDate),
+    ]);
+    return {
+      ...legacy,
+      ...comprehensive.cards,
+      ...comprehensive,
+    };
   },
 
   async getProjects() {
@@ -1943,5 +1972,698 @@ export const hrService = {
       orderBy: { startDate: "desc" },
     });
     return assignments;
+  },
+
+  /**
+   * Return a temporary daily worker request for more information / supervisor correction
+   */
+  async returnTemporaryWorkerRequest(id, reason, actorId) {
+    const existing = await hrRepository.findEmployeeById(id);
+    if (!existing) {
+      throw new Error("Worker not found");
+    }
+
+    if (!reason || !reason.trim()) {
+      throw new Error("A reason is required when returning a temporary worker request for more information");
+    }
+
+    const updated = await hrRepository.updateEmployee(id, {
+      status: "RETURNED",
+    });
+
+    try {
+      if (actorId) {
+        await prisma.auditLog.create({
+          data: {
+            actorUserId: actorId,
+            action: "RETURN_TEMPORARY_WORKER_REQUEST",
+            entityType: "Employee",
+            entityId: id,
+            details: {
+              employeeCode: updated.employeeCode,
+              fullName: updated.fullName,
+              reason: reason.trim(),
+              status: "RETURNED",
+            },
+          },
+        });
+      }
+
+      await notificationService.createNotification({
+        recipientRole: "SUPERVISOR",
+        title: "Temporary Worker Request Returned by HR",
+        message: `HR returned daily worker application for ${updated.fullName} (${updated.employeeCode}). Reason: "${reason.trim()}". Please review and update details.`,
+        type: "WARNING",
+        category: "WORKFORCE",
+        link: "/supervisor/workers",
+      });
+    } catch (e) {
+      console.warn("Audit/Notification warning:", e.message);
+    }
+
+    return updated;
+  },
+
+  /**
+   * Fetch all temporary worker requests / daily worker registrations for HR review
+   */
+  async getTemporaryWorkerRequests({ status = "ALL", projectId = "", search = "", page = 1, limit = 20 }) {
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {};
+
+    if (status && status !== "ALL") {
+      where.status = status;
+    } else {
+      // By default include pending, returned, approved, and rejected temporary/daily workers
+      where.OR = [
+        { status: { in: ["PENDING_APPROVAL", "PENDING", "RETURNED"] } },
+        { employmentType: { in: ["DAILY_LABORER", "CONTRACT", "TEMPORARY"] } },
+      ];
+    }
+
+    if (projectId && projectId !== "ALL") {
+      where.assignedProjectId = projectId;
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.AND = [
+        {
+          OR: [
+            { fullName: { contains: q, mode: "insensitive" } },
+            { employeeCode: { contains: q, mode: "insensitive" } },
+            { phone: { contains: q, mode: "insensitive" } },
+            { trade: { contains: q, mode: "insensitive" } },
+          ],
+        },
+      ];
+    }
+
+    const [requests, total, countsGroup] = await Promise.all([
+      prisma.employee.findMany({
+        where,
+        skip,
+        take: limitNum,
+        include: {
+          assignedProject: {
+            select: { id: true, projectName: true, projectCode: true, location: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.employee.count({ where }),
+      prisma.employee.groupBy({
+        by: ["status"],
+        where: {
+          OR: [
+            { status: { in: ["PENDING_APPROVAL", "PENDING", "RETURNED"] } },
+            { employmentType: { in: ["DAILY_LABORER", "CONTRACT", "TEMPORARY"] } },
+          ],
+        },
+        _count: true,
+      }),
+    ]);
+
+    const counts = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      returned: 0,
+      total,
+    };
+
+    countsGroup.forEach((g) => {
+      const st = (g.status || "").toUpperCase();
+      if (st === "PENDING_APPROVAL" || st === "PENDING") counts.pending += g._count;
+      else if (st === "ACTIVE" || st === "APPROVED") counts.approved += g._count;
+      else if (st === "REJECTED") counts.rejected += g._count;
+      else if (st === "RETURNED") counts.returned += g._count;
+    });
+
+    return {
+      requests: requests.map((r) => ({
+        id: r.id,
+        employeeCode: r.employeeCode,
+        fullName: r.fullName,
+        phone: r.phone,
+        trade: r.trade,
+        employmentType: r.employmentType,
+        dailyRate: r.dailyRate ? Number(r.dailyRate) : 400,
+        currency: r.currency || "ETB",
+        workTeam: r.workTeam || "Site Crew",
+        nationalId: r.nationalId,
+        emergencyContactName: r.emergencyContactName,
+        emergencyContactPhone: r.emergencyContactPhone,
+        status: r.status,
+        projectId: r.assignedProjectId,
+        projectName: r.assignedProject?.projectName || "Unassigned Site",
+        projectCode: r.assignedProject?.projectCode || "",
+        projectLocation: r.assignedProject?.location || "Site Location",
+        createdAt: r.createdAt,
+      })),
+      counts,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 1,
+      },
+    };
+  },
+
+  /**
+   * Comprehensive HR Overview Dashboard with real database metrics
+   */
+  async getComprehensiveHROverview(targetDateStr) {
+    const selectedDate = targetDateStr
+      ? new Date(targetDateStr)
+      : new Date();
+    selectedDate.setUTCHours(0, 0, 0, 0);
+
+    const now = new Date();
+    const in14Days = new Date();
+    in14Days.setDate(in14Days.getDate() + 14);
+
+    const [
+      totalWorkers,
+      activeWorkers,
+      pendingTemporaryRequests,
+      activeAssignments,
+      unassignedWorkers,
+      presentRecords,
+      absentRecords,
+      lateRecords,
+      halfDayRecords,
+      onLeaveRecords,
+      recentRegistrations,
+      recentAssignments,
+      pendingRequests,
+      assignmentsEndingSoon,
+      allActiveProjects,
+      todayAttendancesByProject,
+    ] = await Promise.all([
+      prisma.employee.count(),
+      prisma.employee.count({ where: { status: "ACTIVE" } }),
+      prisma.employee.count({ where: { status: { in: ["PENDING_APPROVAL", "PENDING", "RETURNED"] } } }),
+      prisma.projectAssignment.count({ where: { status: "ACTIVE" } }),
+      prisma.employee.count({ where: { status: "ACTIVE", assignedProjectId: null } }),
+      prisma.attendance.count({ where: { date: selectedDate, status: "PRESENT" } }),
+      prisma.attendance.count({ where: { date: selectedDate, status: "ABSENT" } }),
+      prisma.attendance.count({ where: { date: selectedDate, status: "LATE" } }),
+      prisma.attendance.count({ where: { date: selectedDate, status: "HALF_DAY" } }),
+      prisma.attendance.count({ where: { date: selectedDate, status: "ON_LEAVE" } }),
+      prisma.employee.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { assignedProject: { select: { projectName: true, projectCode: true } } },
+      }),
+      prisma.projectAssignment.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: {
+          employee: { select: { fullName: true, employeeCode: true, trade: true } },
+          project: { select: { projectName: true, projectCode: true, location: true } },
+        },
+      }),
+      prisma.employee.findMany({
+        where: { status: { in: ["PENDING_APPROVAL", "PENDING", "RETURNED"] } },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { assignedProject: { select: { projectName: true, projectCode: true } } },
+      }),
+      prisma.projectAssignment.findMany({
+        where: {
+          status: "ACTIVE",
+          endDate: { not: null, gte: now, lte: in14Days },
+        },
+        take: 5,
+        orderBy: { endDate: "asc" },
+        include: {
+          employee: { select: { fullName: true, employeeCode: true, trade: true, phone: true } },
+          project: { select: { projectName: true, projectCode: true, location: true } },
+        },
+      }),
+      prisma.project.findMany({
+        where: { archivedAt: null },
+        include: {
+          supervisor: { select: { id: true, fullName: true, phone: true } },
+          _count: { select: { employees: true } },
+        },
+      }),
+      prisma.attendance.groupBy({
+        by: ["projectId"],
+        where: { date: selectedDate },
+        _count: true,
+      }),
+    ]);
+
+    // Check which projects with assigned workers have NO attendance submitted today
+    const submittedProjectIds = new Set(todayAttendancesByProject.map((a) => a.projectId).filter(Boolean));
+    const missingSubmissionsList = [];
+
+    allActiveProjects.forEach((proj) => {
+      const assignedCount = proj._count?.employees || 0;
+      if (assignedCount > 0 && !submittedProjectIds.has(proj.id)) {
+        missingSubmissionsList.push({
+          projectId: proj.id,
+          projectName: proj.projectName,
+          projectCode: proj.projectCode,
+          location: proj.location,
+          assignedWorkers: assignedCount,
+          supervisorName: proj.supervisor?.fullName || "Unassigned Supervisor",
+          supervisorPhone: proj.supervisor?.phone || "N/A",
+        });
+      }
+    });
+
+    const presentToday = presentRecords + lateRecords + halfDayRecords;
+    const absentToday = absentRecords;
+    const missingAttendanceSubmissions = missingSubmissionsList.reduce((acc, p) => acc + p.assignedWorkers, 0);
+
+    return {
+      cards: {
+        totalWorkers,
+        activeWorkers,
+        pendingTemporaryRequests,
+        activeAssignments,
+        unassignedWorkers,
+        presentToday,
+        absentToday,
+        missingAttendanceSubmissions,
+      },
+      attendanceSummary: {
+        date: selectedDate.toISOString().split("T")[0],
+        present: presentRecords,
+        late: lateRecords,
+        halfDay: halfDayRecords,
+        absent: absentRecords,
+        onLeave: onLeaveRecords,
+        totalLogged: presentRecords + lateRecords + halfDayRecords + absentRecords + onLeaveRecords,
+      },
+      recentRegistrations: recentRegistrations.map((emp) => ({
+        id: emp.id,
+        fullName: emp.fullName,
+        employeeCode: emp.employeeCode,
+        trade: emp.trade,
+        employmentType: emp.employmentType,
+        status: emp.status,
+        projectName: emp.assignedProject?.projectName || "Unassigned",
+        createdAt: emp.createdAt,
+      })),
+      recentAssignments: recentAssignments.map((a) => ({
+        id: a.id,
+        workerName: a.employee?.fullName || "Worker",
+        workerCode: a.employee?.employeeCode || "",
+        trade: a.jobRole || a.employee?.trade,
+        projectName: a.project?.projectName || "Project Site",
+        projectCode: a.project?.projectCode || "",
+        location: a.project?.location || "",
+        startDate: a.startDate,
+        status: a.status,
+      })),
+      pendingRequests: pendingRequests.map((r) => ({
+        id: r.id,
+        fullName: r.fullName,
+        employeeCode: r.employeeCode,
+        trade: r.trade,
+        projectName: r.assignedProject?.projectName || "Site Project",
+        projectCode: r.assignedProject?.projectCode || "",
+        status: r.status,
+        createdAt: r.createdAt,
+      })),
+      assignmentsEndingSoon: assignmentsEndingSoon.map((a) => {
+        const diffMs = new Date(a.endDate) - now;
+        const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        return {
+          id: a.id,
+          workerName: a.employee?.fullName || "Worker",
+          workerCode: a.employee?.employeeCode || "",
+          trade: a.jobRole || a.employee?.trade,
+          phone: a.employee?.phone,
+          projectName: a.project?.projectName || "Site",
+          endDate: a.endDate,
+          daysRemaining,
+        };
+      }),
+      missingSubmissionsList,
+    };
+  },
+
+  /**
+   * Project & Site Assignments Listing with Filters & Pagination
+   */
+  async getProjectAssignmentsList({ status = "ALL", projectId = "", search = "", page = 1, limit = 15 }) {
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 15));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {};
+
+    if (status && status !== "ALL") {
+      where.status = status;
+    }
+
+    if (projectId && projectId !== "ALL") {
+      where.projectId = projectId;
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { employee: { fullName: { contains: q, mode: "insensitive" } } },
+        { employee: { employeeCode: { contains: q, mode: "insensitive" } } },
+        { project: { projectName: { contains: q, mode: "insensitive" } } },
+        { project: { projectCode: { contains: q, mode: "insensitive" } } },
+        { jobRole: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    const [assignments, total, totalAssignments, activeAssignments, unassignedWorkers] = await Promise.all([
+      prisma.projectAssignment.findMany({
+        where,
+        skip,
+        take: limitNum,
+        include: {
+          employee: {
+            select: { id: true, fullName: true, employeeCode: true, trade: true, phone: true, status: true },
+          },
+          project: {
+            select: { id: true, projectName: true, projectCode: true, location: true, status: true },
+          },
+        },
+        orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      }),
+      prisma.projectAssignment.count({ where }),
+      prisma.projectAssignment.count(),
+      prisma.projectAssignment.count({ where: { status: "ACTIVE" } }),
+      prisma.employee.count({ where: { status: "ACTIVE", assignedProjectId: null } }),
+    ]);
+
+    return {
+      assignments: assignments.map((a) => ({
+        id: a.id,
+        employeeId: a.employeeId,
+        workerName: a.employee?.fullName || "Worker",
+        workerCode: a.employee?.employeeCode || "",
+        workerPhone: a.employee?.phone || "",
+        workerTrade: a.employee?.trade || "LABORER",
+        projectId: a.projectId,
+        projectName: a.project?.projectName || "Project",
+        projectCode: a.project?.projectCode || "",
+        projectLocation: a.project?.location || "Site",
+        jobRole: a.jobRole,
+        workTeam: a.workTeam || "Main Team",
+        startDate: a.startDate,
+        endDate: a.endDate,
+        status: a.status,
+        notes: a.notes,
+        createdAt: a.createdAt,
+      })),
+      metrics: {
+        totalAssignments,
+        activeAssignments,
+        unassignedWorkers,
+      },
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 1,
+      },
+    };
+  },
+
+  /**
+   * End an assignment cleanly (record actual end date & reason, update worker availability)
+   */
+  async endProjectAssignment(assignmentId, { actualEndDate, reason }, actorId) {
+    const existing = await prisma.projectAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { employee: true, project: true },
+    });
+
+    if (!existing) {
+      throw new Error("Assignment record not found");
+    }
+
+    if (existing.status !== "ACTIVE") {
+      throw new Error(`Assignment is already ${existing.status.toLowerCase()}`);
+    }
+
+    const endDate = actualEndDate ? new Date(actualEndDate) : new Date();
+
+    const updated = await prisma.projectAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        status: "COMPLETED",
+        endDate,
+        notes: reason ? `${existing.notes ? existing.notes + " • " : ""}Ended: ${reason}` : existing.notes,
+      },
+    });
+
+    // Check if worker has other active assignments
+    const otherActive = await prisma.projectAssignment.findFirst({
+      where: {
+        employeeId: existing.employeeId,
+        id: { not: assignmentId },
+        status: "ACTIVE",
+      },
+    });
+
+    if (!otherActive) {
+      await prisma.employee.update({
+        where: { id: existing.employeeId },
+        data: { assignedProjectId: null },
+      });
+    }
+
+    try {
+      if (actorId) {
+        await prisma.auditLog.create({
+          data: {
+            actorUserId: actorId,
+            action: "END_PROJECT_ASSIGNMENT",
+            entityType: "ProjectAssignment",
+            entityId: assignmentId,
+            details: {
+              employeeId: existing.employeeId,
+              projectId: existing.projectId,
+              actualEndDate: endDate,
+              reason: reason || "Normal assignment completion",
+            },
+          },
+        });
+      }
+
+      await notificationService.createNotification({
+        title: "Site Assignment Completed",
+        message: `${existing.employee?.fullName} has completed assignment on "${existing.project?.projectName}". Worker is now available for new assignments.`,
+        type: "INFO",
+        category: "WORKFORCE",
+        link: "/hr/assignments",
+      });
+    } catch (e) {
+      console.warn("Audit/Notification warning:", e.message);
+    }
+
+    return updated;
+  },
+
+  /**
+   * Workforce Availability Overview (Available, Assigned, On Leave, Unavailable)
+   */
+  async getWorkforceAvailability({ search = "", trade = "", category = "ALL" }) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const where = {};
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { fullName: { contains: q, mode: "insensitive" } },
+        { employeeCode: { contains: q, mode: "insensitive" } },
+        { phone: { contains: q, mode: "insensitive" } },
+      ];
+    }
+    if (trade && trade !== "ALL") {
+      where.trade = trade;
+    }
+
+    const [allEmployees, activeLeaves, activeProjects] = await Promise.all([
+      prisma.employee.findMany({
+        where,
+        include: {
+          assignedProject: { select: { id: true, projectName: true, projectCode: true, location: true } },
+          projectAssignments: {
+            where: { status: "ACTIVE" },
+            include: { project: { select: { id: true, projectName: true, projectCode: true, location: true } } },
+            take: 1,
+            orderBy: { startDate: "desc" },
+          },
+        },
+        orderBy: { fullName: "asc" },
+      }),
+      prisma.leaveRequest.findMany({
+        where: {
+          status: "APPROVED",
+          startDate: { lte: today },
+          endDate: { gte: today },
+        },
+        select: { employeeId: true, leaveType: true, startDate: true, endDate: true },
+      }),
+      prisma.project.findMany({
+        where: { archivedAt: null },
+        include: { _count: { select: { employees: true } } },
+      }),
+    ]);
+
+    const leaveByEmployee = new Map();
+    activeLeaves.forEach((l) => leaveByEmployee.set(l.employeeId, l));
+
+    const categorized = {
+      available: [],
+      assigned: [],
+      onLeave: [],
+      unavailable: [],
+    };
+
+    allEmployees.forEach((emp) => {
+      const activeAssignment = emp.projectAssignments?.[0];
+      const activeLeave = leaveByEmployee.get(emp.id);
+
+      const workerCard = {
+        id: emp.id,
+        fullName: emp.fullName,
+        employeeCode: emp.employeeCode,
+        trade: emp.trade,
+        phone: emp.phone,
+        status: emp.status,
+        employmentType: emp.employmentType,
+        dailyRate: emp.dailyRate ? Number(emp.dailyRate) : 400,
+        workTeam: emp.workTeam || "Main Team",
+        assignedProject: emp.assignedProject || activeAssignment?.project || null,
+        assignmentStartDate: activeAssignment?.startDate || null,
+        assignmentEndDate: activeAssignment?.endDate || null,
+        activeLeave: activeLeave
+          ? {
+              leaveType: activeLeave.leaveType,
+              startDate: activeLeave.startDate,
+              endDate: activeLeave.endDate,
+            }
+          : null,
+      };
+
+      if (emp.status !== "ACTIVE") {
+        categorized.unavailable.push(workerCard);
+      } else if (activeLeave) {
+        categorized.onLeave.push(workerCard);
+      } else if (activeAssignment || emp.assignedProjectId) {
+        categorized.assigned.push(workerCard);
+      } else {
+        categorized.available.push(workerCard);
+      }
+    });
+
+    // Recommendations for projects with low workforce
+    const projectShortages = activeProjects
+      .filter((p) => (p._count?.employees || 0) < 5)
+      .map((p) => {
+        const assigned = p._count?.employees || 0;
+        const deficit = Math.max(1, 5 - assigned);
+        return {
+          projectId: p.id,
+          projectName: p.projectName,
+          assignedCount: assigned,
+          deficitCount: deficit,
+          neededRole: "Site Laborers / Tradesmen",
+          neededTrade: "GENERAL_LABORER",
+          recommendedWorkers: categorized.available.slice(0, 3),
+        };
+      });
+
+    const counts = {
+      total: allEmployees.length,
+      available: categorized.available.length,
+      assigned: categorized.assigned.length,
+      onLeave: categorized.onLeave.length,
+      unavailable: categorized.unavailable.length,
+    };
+
+    return {
+      metrics: counts,
+      counts,
+      workers: categorized,
+      categories: categorized,
+      projectShortages,
+      shortages: projectShortages,
+    };
+  },
+
+  /**
+   * Report an attendance issue or request supervisor review (strictly read-only for HR)
+   */
+  async reportAttendanceIssue({ attendanceId, workerId, projectId, date, issueType, description }, actorId) {
+    if (!description || !description.trim()) {
+      throw new Error("A description of the attendance issue is required");
+    }
+
+    let project = null;
+    let worker = null;
+
+    if (projectId) {
+      project = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: { supervisor: true },
+      });
+    }
+
+    if (workerId) {
+      worker = await prisma.employee.findUnique({
+        where: { id: workerId },
+      });
+    }
+
+    const issueDetails = {
+      attendanceId: attendanceId || null,
+      workerId: workerId || null,
+      workerName: worker?.fullName || "Site Worker",
+      workerCode: worker?.employeeCode || "",
+      projectId: projectId || null,
+      projectName: project?.projectName || "Construction Site",
+      date: date || new Date().toISOString().split("T")[0],
+      issueType: issueType || "RECORD_DISCREPANCY",
+      description: description.trim(),
+      reportedAt: new Date().toISOString(),
+    };
+
+    // Log to Audit Log without modifying the actual attendance record
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: actorId,
+        action: "REPORT_ATTENDANCE_ISSUE",
+        entityType: "Attendance",
+        entityId: attendanceId || workerId || projectId,
+        details: issueDetails,
+      },
+    });
+
+    // Send actionable notification to the site supervisor
+    await notificationService.createNotification({
+      recipientRole: "SUPERVISOR",
+      title: "Attendance Review Requested by HR",
+      message: `HR Manager reported a potential attendance issue on "${project?.projectName || "Site"}": ${description.trim()}. Please verify shift records.`,
+      type: "WARNING",
+      category: "ATTENDANCE",
+      link: `/supervisor/attendance?projectId=${projectId || ""}&date=${date || ""}`,
+    });
+
+    return {
+      success: true,
+      message: "Attendance issue successfully flagged and routed to the site supervisor for review.",
+      details: issueDetails,
+    };
   },
 };

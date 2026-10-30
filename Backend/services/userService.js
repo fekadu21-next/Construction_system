@@ -318,7 +318,64 @@ export const userService = {
         const userRole = user.role?.name || "SITE_LABORER";
         const trade = WORKER_TRADE[userRole] ? userRole : "SITE_LABORER";
 
-        await prisma.employee.create({
+        const newEmp = await prisma.employee.create({
+          data: {
+            employeeCode,
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.phone?.trim() || "+251900000000",
+            trade,
+            employmentType: "FULL_TIME",
+            status: user.isActive ? "ACTIVE" : "INACTIVE",
+            hireDate: new Date(),
+            workTeam: ["SUPERVISOR", "SUPERVISER", "SITE_ENGINEER"].includes(userRole) ? "Site Management" : "Executive & Staff",
+            assignedProjectId: data.assignedProjectId || null,
+            currency: "ETB",
+          },
+        });
+
+        if (data.assignedProjectId) {
+          try {
+            await prisma.projectAssignment.create({
+              data: {
+                employeeId: newEmp.id,
+                projectId: data.assignedProjectId,
+                jobRole: trade,
+                workTeam: ["SUPERVISOR", "SUPERVISER", "SITE_ENGINEER"].includes(userRole) ? "Site Management" : "Executive & Staff",
+                startDate: new Date(),
+                status: "ACTIVE",
+                notes: "Assigned during user onboarding",
+                assignedById: actorId,
+              },
+            });
+
+            if (["SUPERVISOR", "SUPERVISER"].includes(userRole)) {
+              await prisma.project.update({
+                where: { id: data.assignedProjectId },
+                data: { supervisorId: user.id },
+              });
+            } else if (userRole === "PROJECT_MANAGER") {
+              await prisma.project.update({
+                where: { id: data.assignedProjectId },
+                data: { projectManagerId: user.id },
+              });
+            } else if (userRole === "SITE_ENGINEER") {
+              await prisma.project.update({
+                where: { id: data.assignedProjectId },
+                data: { siteEngineerId: user.id },
+              });
+            }
+          } catch (assignLogErr) {
+            console.warn("Assignment creation warning:", assignLogErr.message);
+          }
+        }
+      } else if (data.assignedProjectId && !existingEmployee.assignedProjectId) {
+        await prisma.employee.update({
+          where: { id: existingEmployee.id },
+          data: { assignedProjectId: data.assignedProjectId },
+        });
+      }
+      /*
           data: {
             employeeCode,
             fullName: user.fullName,
@@ -333,6 +390,7 @@ export const userService = {
           },
         });
       }
+      */
     } catch (empSyncErr) {
       console.warn("Auto-syncing new user to employee table warning:", empSyncErr.message);
     }

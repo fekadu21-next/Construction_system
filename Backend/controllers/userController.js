@@ -1,4 +1,6 @@
 import { userService } from "../services/userService.js";
+import { USER_ROLES } from "../utils/constants.js";
+import { hrService } from "../services/hr/hrService.js";
 
 export const userController = {
   async getUsers(req, res, next) {
@@ -89,7 +91,34 @@ export const userController = {
       const actorId = req.userId;
       const data = req.body;
 
+      // Restrict HR Managers to only 6 operational administrative roles
+      if (req.userRole === USER_ROLES.HR_MANAGER) {
+        const allowedRoles = [
+          USER_ROLES.SUPERVISOR,
+          "SUPERVISER",
+          USER_ROLES.HR_MANAGER,
+          USER_ROLES.ACCOUNTANT,
+          USER_ROLES.PROJECT_MANAGER,
+          USER_ROLES.SITE_ENGINEER,
+          USER_ROLES.PROCUREMENT_OFFICER,
+        ];
+        const requestedRole = (data.role || data.roleId || "").toUpperCase();
+        if (!allowedRoles.includes(requestedRole)) {
+          return res.status(403).json({
+            success: false,
+            message: "HR Managers are only permitted to create operational staff user accounts (Supervisor, HR, Accountant, Project Manager, Site Engineer, Procurement Officer).",
+          });
+        }
+      }
+
       const user = await userService.createUser(data, actorId);
+
+      // Automatically sync newly created user into employee workforce table
+      try {
+        await hrService.autoSyncUsersToEmployees();
+      } catch (syncErr) {
+        console.warn("Auto-syncing created user to employee roster warning:", syncErr.message);
+      }
 
       res.status(201).json({
         success: true,

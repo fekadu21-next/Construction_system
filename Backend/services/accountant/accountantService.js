@@ -161,12 +161,49 @@ export const accountantService = {
    * Budget Management & Revisions
    */
   async getBudgets(projectId) {
+    const projWhere = { archivedAt: null };
+    if (projectId && projectId !== "all") {
+      projWhere.id = projectId;
+    }
+
+    const projects = await prisma.project.findMany({
+      where: projWhere,
+      select: {
+        id: true,
+        projectName: true,
+        projectCode: true,
+        budget: true,
+        currency: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const projectIds = projects.map((p) => p.id);
+
+    // Get approved/posted expenses for these projects
+    const expenses = await prisma.projectExpense.findMany({
+      where: {
+        projectId: { in: projectIds },
+        approvalStatus: { in: ["APPROVED", "POSTED"] },
+      },
+      select: {
+        id: true,
+        projectId: true,
+        category: true,
+        amount: true,
+      },
+    });
+
+    // Get category budgets
     const where = {};
     if (projectId && projectId !== "all") {
       where.projectId = projectId;
     }
 
-    const budgets = await prisma.projectBudget.findMany({
+    const categoryBudgets = await prisma.projectBudget.findMany({
       where,
       include: {
         project: { select: { id: true, projectName: true, projectCode: true, budget: true, currency: true } },
@@ -174,11 +211,107 @@ export const accountantService = {
       orderBy: { createdAt: "desc" },
     });
 
-    return budgets;
+    // Project summary with total allocated budget, spent, remaining, utilization
+    const projectSummaries = projects.map((p) => {
+      const pExpenses = expenses.filter((e) => e.projectId === p.id);
+      const spent = pExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      const allocatedBudget = Number(p.budget || 0);
+      const remaining = Math.max(0, allocatedBudget - spent);
+      const utilization = allocatedBudget > 0 ? Math.round((spent / allocatedBudget) * 10000) / 100 : 0;
+
+      // Category breakdown for this project
+      const pCategoryBudgets = categoryBudgets.filter((b) => b.projectId === p.id);
+
+      return {
+        id: p.id,
+        projectName: p.projectName,
+        projectCode: p.projectCode,
+        allocatedBudget,
+        spent: Math.round(spent * 100) / 100,
+        remaining: Math.round(remaining * 100) / 100,
+        utilization,
+        currency: p.currency || "ETB",
+        status: p.status,
+        categoryBudgets: pCategoryBudgets,
+      };
+    });
+
+    const totalAllocatedBudget = projects.reduce((sum, p) => sum + Number(p.budget || 0), 0);
+    const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const totalRemaining = Math.max(0, totalAllocatedBudget - totalSpent);
+    const overallUtilization = totalAllocatedBudget > 0
+      ? Math.round((totalSpent / totalAllocatedBudget) * 10000) / 100
+      : 0;
+
+    return {
+      summary: {
+        totalAllocatedBudget: Math.round(totalAllocatedBudget * 100) / 100,
+        totalSpent: Math.round(totalSpent * 100) / 100,
+        totalRemaining: Math.round(totalRemaining * 100) / 100,
+        overallUtilization,
+      },
+      projects: projectSummaries,
+      categoryBudgets,
+      records: categoryBudgets,
+    };
+  },
+
+  async updateProjectAllocatedBudget(projectId, { budget, reason }, actorId) {
+    if (!projectId || budget === undefined || budget === null) {
+      throw new Error("Project ID and allocated budget amount are required");
+    }
+    const numBudget = Number(budget);
+    if (isNaN(numBudget) || numBudget < 0) {
+      throw new Error("Budget must be a valid positive number");
+    }
+
+    const updated = await prisma.project.update({
+      where: { id: projectId },
+      data: { budget: numBudget },
+      select: { id: true, projectName: true, projectCode: true, budget: true, currency: true },
+    });
+
+    // Record in project_budgets as OVERALL revision
+    await prisma.projectBudget.create({
+      data: {
+        projectId,
+        category: "OVERALL",
+        allocatedAmount: numBudget,
+        revisionReason: reason || "Allocated budget updated",
+        status: "APPROVED",
+        createdById: actorId,
+        approvedById: actorId,
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: actorId,
+          action: "UPDATE_PROJECT_ALLOCATED_BUDGET",
+          entityType: "Project",
+          entityId: projectId,
+          details: { newBudget: numBudget, reason },
+        },
+      });
+
+      await notificationService.createNotification({
+        recipientRole: "GENERAL_MANAGER",
+        title: "Project Allocated Budget Updated",
+        message: `Allocated budget for "${updated.projectName}" set to ${numBudget.toLocaleString()} ETB`,
+        type: "INFO",
+        category: "BUDGET",
+        link: "/accountant/budgets",
+      });
+    } catch (e) {
+      console.warn("Audit log notice:", e.message);
+    }
+
+    return updated;
   },
 
   async createOrReviseBudget(data, actorId) {
-    const { projectId, category, allocatedAmount, revisedAmount, revisionReason, fiscalPeriod = "2026" } = data;
+    const { projectId, category, allocatedAmount, revisedAmount, revisionReason, fiscalPeriod = "2026", updateProjectBudget } = data;
 
     if (!projectId || !category || allocatedAmount === undefined) {
       throw new Error("Project ID, category, and allocated budget amount are required");
@@ -191,12 +324,23 @@ export const accountantService = {
       throw new Error("Project not found");
     }
 
+    const numAllocated = Number(allocatedAmount);
+    const numRevised = revisedAmount ? Number(revisedAmount) : null;
+
+    // If OVERALL category or updateProjectBudget flag is set, update project.budget
+    if (category === "OVERALL" || updateProjectBudget) {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { budget: numRevised || numAllocated },
+      });
+    }
+
     const budget = await prisma.projectBudget.create({
       data: {
         projectId,
         category,
-        allocatedAmount: Number(allocatedAmount),
-        revisedAmount: revisedAmount ? Number(revisedAmount) : null,
+        allocatedAmount: numAllocated,
+        revisedAmount: numRevised,
         revisionReason: revisionReason || null,
         fiscalPeriod,
         status: "APPROVED",
@@ -215,14 +359,14 @@ export const accountantService = {
           action: "ALLOCATE_PROJECT_BUDGET",
           entityType: "ProjectBudget",
           entityId: budget.id,
-          details: { projectId, category, allocatedAmount, revisedAmount },
+          details: { projectId, category, allocatedAmount: numAllocated, revisedAmount: numRevised },
         },
       });
 
       await notificationService.createNotification({
         recipientRole: "GENERAL_MANAGER",
         title: "Budget Allocation Recorded",
-        message: `${category} budget of ${allocatedAmount} ETB recorded for "${budget.project.projectName}"`,
+        message: `${category} budget of ${numAllocated} ETB recorded for "${budget.project.projectName}"`,
         type: "INFO",
         category: "BUDGET",
         link: "/accountant/budgets",
@@ -455,7 +599,7 @@ export const accountantService = {
    */
   async getEligibleAttendanceSheets(projectId) {
     const where = {
-      approvalStatus: { in: ["APPROVED", "SUBMITTED"] },
+      approvalStatus: { in: ["APPROVED", "SUBMITTED", "DRAFT"] },
       laborCostPosted: false,
     };
     if (projectId && projectId !== "all") {
@@ -479,7 +623,7 @@ export const accountantService = {
           where: {
             date: s.date,
             projectId: s.projectId,
-            approvalStatus: { in: ["APPROVED", "SUBMITTED"] },
+            approvalStatus: { in: ["APPROVED", "SUBMITTED", "DRAFT"] },
           },
           include: {
             employee: { select: { dailyRate: true, monthlySalary: true, employmentType: true, fullName: true, employeeCode: true } },
@@ -866,5 +1010,138 @@ export const accountantService = {
       ORDER BY name ASC
     `);
     return suppliers;
+  },
+
+  /**
+   * Material Costs tracking & analytics
+   */
+  async getMaterialCosts(projectId) {
+    const projWhere = { archivedAt: null };
+    if (projectId && projectId !== "all") {
+      projWhere.id = projectId;
+    }
+
+    const projects = await prisma.project.findMany({
+      where: projWhere,
+      select: { id: true, projectName: true, projectCode: true, budget: true, currency: true },
+    });
+
+    const projectIds = projects.map((p) => p.id);
+
+    // 1. Material Requests & Purchases
+    const requestsWhere = {};
+    if (projectId && projectId !== "all") {
+      requestsWhere.projectId = projectId;
+    }
+
+    let materialRequests = [];
+    try {
+      materialRequests = await prisma.materialRequest.findMany({
+        where: requestsWhere,
+        include: {
+          project: { select: { id: true, projectName: true, projectCode: true } },
+          requester: { select: { id: true, fullName: true, email: true } },
+          items: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (e) {
+      console.warn("materialRequests query warning:", e.message);
+    }
+
+    // 2. Material Expenses (Category = MATERIALS or MATERIAL)
+    const materialExpenses = await prisma.projectExpense.findMany({
+      where: {
+        projectId: { in: projectIds },
+        category: { in: ["MATERIALS", "MATERIAL"] },
+      },
+      include: {
+        project: { select: { id: true, projectName: true, projectCode: true } },
+      },
+      orderBy: { expenseDate: "desc" },
+    });
+
+    // 3. Material Budgets
+    const materialBudgets = await prisma.projectBudget.findMany({
+      where: {
+        projectId: { in: projectIds },
+        category: "MATERIALS",
+      },
+    });
+
+    const totalMaterialBudget = materialBudgets.reduce((sum, b) => sum + Number(b.allocatedAmount || 0), 0);
+    const totalMaterialSpend = materialExpenses
+      .filter((e) => ["APPROVED", "POSTED"].includes(e.approvalStatus))
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    const pendingRequests = materialRequests.filter((r) => r.status === "PENDING" || r.status === "SUBMITTED");
+    const pendingCommitments = pendingRequests.reduce((sum, r) => sum + Number(r.totalEstimatedCost || 0), 0);
+    const variance = totalMaterialBudget - totalMaterialSpend;
+
+    return {
+      projects,
+      summary: {
+        totalMaterialBudget,
+        totalMaterialSpend,
+        pendingCommitments,
+        variance,
+        totalRequestsCount: materialRequests.length,
+        pendingRequestsCount: pendingRequests.length,
+        totalExpensesCount: materialExpenses.length,
+        currency: "ETB",
+      },
+      requests: materialRequests,
+      expenses: materialExpenses,
+    };
+  },
+
+  /**
+   * Record Material Purchase / Receipt Cost into Project Ledger
+   */
+  async recordMaterialCost(data, actorId) {
+    const {
+      projectId,
+      amount,
+      description,
+      payee,
+      supplierId,
+      receiptNumber,
+      paymentMethod = "BANK_TRANSFER",
+      receiptUrl,
+      notes,
+    } = data;
+
+    if (!projectId || !amount) {
+      throw new Error("Project ID and Amount are required to record a material cost");
+    }
+
+    const referenceNumber = receiptNumber || `MAT-${Date.now().toString().slice(-6)}`;
+
+    const expense = await prisma.projectExpense.create({
+      data: {
+        projectId,
+        category: "MATERIALS",
+        amount: Number(amount),
+        currency: "ETB",
+        description: description || "Site material purchase & delivery",
+        expenseDate: new Date(),
+        referenceNumber,
+        payee: payee || "Material Vendor",
+        supplierId: supplierId || null,
+        paymentMethod,
+        receiptUrl: receiptUrl || null,
+        approvalStatus: "APPROVED",
+        approvedById: actorId,
+        approvedAt: new Date(),
+        paymentStatus: "PAID",
+        notes,
+        recordedById: actorId,
+      },
+      include: {
+        project: { select: { projectName: true, projectCode: true } },
+      },
+    });
+
+    return expense;
   },
 };

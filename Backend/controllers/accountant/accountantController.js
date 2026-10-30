@@ -30,6 +30,16 @@ export const accountantController = {
     }
   },
 
+  async updateProjectBudget(req, res, next) {
+    try {
+      const { projectId } = req.params;
+      const data = await accountantService.updateProjectAllocatedBudget(projectId, req.body, req.userId);
+      res.json({ success: true, data, message: "Project allocated budget updated successfully" });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async getExpenses(req, res, next) {
     try {
       const data = await accountantService.getExpenses(req.query);
@@ -129,6 +139,25 @@ export const accountantController = {
     try {
       const data = await accountantService.getSuppliers();
       res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async getMaterialCosts(req, res, next) {
+    try {
+      const { projectId } = req.query;
+      const data = await accountantService.getMaterialCosts(projectId);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async recordMaterialCost(req, res, next) {
+    try {
+      const data = await accountantService.recordMaterialCost(req.body, req.userId);
+      res.status(201).json({ success: true, data });
     } catch (err) {
       next(err);
     }

@@ -38,15 +38,15 @@ export default function SupervisorLayout() {
   };
 
   const navItems = [
-    { label: "Site Operations", path: "/supervisor/dashboard", icon: "📊" },
-    { label: "Daily Attendance", path: "/supervisor/attendance", icon: "⏱️" },
-    { label: "Tasks & Progress", path: "/supervisor/tasks", icon: "📋" },
-    { label: "Site Settings", path: "/supervisor/settings", icon: "⚙️" },
-    { label: "My Profile", path: "/supervisor/profile", icon: "👤" },
+    { label: "Overview", path: "/supervisor/dashboard", icon: "📊" },
+    { label: "Worker Management", path: "/supervisor/workers", icon: "👥" },
+    { label: "Attendance", path: "/supervisor/attendance", icon: "⏱️" },
+    { label: "Settings", path: "/supervisor/settings", icon: "⚙️" },
+    { label: "Profile", path: "/supervisor/profile", icon: "👤" },
   ];
 
   return (
-    <div className={`min-h-screen flex ${isDark ? "bg-[#0a0f1d] text-slate-100" : "bg-slate-50 text-slate-900"} transition-colors duration-200`}>
+    <div className={`h-screen overflow-hidden flex ${isDark ? "bg-[#0a0f1d] text-slate-100" : "bg-slate-50 text-slate-900"} transition-colors duration-200`}>
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
@@ -55,16 +55,16 @@ export default function SupervisorLayout() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Static / Fixed Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col border-r transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto shrink-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 h-full min-h-0 shrink-0 flex flex-col border-r transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
           isDark
             ? "bg-[#0d1527] border-slate-800 text-slate-200"
             : "bg-white border-slate-200 text-slate-700 shadow-sm"
         } ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Brand Header */}
-        <div className={`h-16 flex items-center justify-between px-6 border-b ${isDark ? "border-slate-800" : "border-slate-100"}`}>
+        <div className={`h-16 flex items-center justify-between px-6 border-b shrink-0 ${isDark ? "border-slate-800" : "border-slate-100"}`}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
               🦺
@@ -96,7 +96,7 @@ export default function SupervisorLayout() {
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 overflow-y-auto px-4 py-5 space-y-1.5">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-5 space-y-1.5 custom-scrollbar">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 pb-2">
             Site Management
           </div>
@@ -131,7 +131,7 @@ export default function SupervisorLayout() {
         </nav>
 
         {/* User Card */}
-        <div className={`p-4 border-t ${isDark ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-slate-50/50"}`}>
+        <div className={`p-4 border-t shrink-0 ${isDark ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-slate-50/50"}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-full bg-amber-500 text-white font-bold flex items-center justify-center shrink-0">
@@ -154,7 +154,7 @@ export default function SupervisorLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Top Navbar (Sticky Static Header) */}
         <header className={`sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-6 border-b shrink-0 transition-colors backdrop-blur-md ${
           isDark ? "bg-[#0d1527]/95 border-slate-800 shadow-sm" : "bg-white/95 border-slate-200 shadow-xs"
@@ -398,7 +398,7 @@ export default function SupervisorLayout() {
         </header>
 
         {/* Page Content Body */}
-        <main className="flex-1 p-4 sm:p-6 lg:px-8 lg:py-6 overflow-y-auto max-w-[1600px] w-full mx-auto">
+        <main className="flex-1 min-h-0 p-4 sm:p-6 lg:px-8 lg:py-6 overflow-y-auto max-w-[1600px] w-full mx-auto">
           <Outlet />
         </main>
       </div>

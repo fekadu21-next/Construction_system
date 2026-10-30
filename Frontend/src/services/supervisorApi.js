@@ -46,6 +46,15 @@ export const supervisorApi = {
     }
   },
 
+  async getAttendanceHistory(params) {
+    try {
+      const response = await api.get("/api/supervisor/attendance/history", { params });
+      return { success: true, data: response.data.data };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || "Failed to load attendance history" };
+    }
+  },
+
   async saveAttendance(data) {
     try {
       const response = await api.post("/api/supervisor/attendance", data);

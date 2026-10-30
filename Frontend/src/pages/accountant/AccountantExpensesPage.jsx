@@ -98,9 +98,15 @@ export default function AccountantExpensesPage() {
 
       const expRes = await accountantApi.getExpenses(params);
       if (expRes.success) {
-        setExpenses(expRes.data);
+        const list = Array.isArray(expRes.data)
+          ? expRes.data
+          : Array.isArray(expRes.data?.expenses)
+          ? expRes.data.expenses
+          : [];
+        setExpenses(list);
       } else {
-        setError(expRes.error);
+        setError(expRes.error || "Failed to load project expenses");
+        setExpenses([]);
       }
     } catch {
       setError("Failed to load project expenses");
@@ -197,11 +203,17 @@ export default function AccountantExpensesPage() {
     }
   };
 
-  const filteredExpenses = expenses.filter((exp) => {
+  const expenseList = Array.isArray(expenses)
+    ? expenses
+    : Array.isArray(expenses?.expenses)
+    ? expenses.expenses
+    : [];
+
+  const filteredExpenses = expenseList.filter((exp) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     const desc = exp.description?.toLowerCase() || "";
-    const ref = exp.expenseRef?.toLowerCase() || "";
+    const ref = (exp.expenseRef || exp.referenceNumber || "")?.toLowerCase() || "";
     const payee = exp.payee?.toLowerCase() || "";
     return desc.includes(query) || ref.includes(query) || payee.includes(query);
   });

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { usersApi } from "../../services/usersApi.js";
+import { projectsApi } from "../../services/projectsApi.js";
 import { USER_ROLES, ROLE_LABELS } from "../../constants/roles.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { useLanguage } from "../../contexts/LanguageContext.jsx";
@@ -70,6 +71,7 @@ export default function UsersPage() {
     rolesCount: 7,
   });
   const [roles, setRoles] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [notification, setNotification] = useState(null); // { type: 'success' | 'error' | 'warning', message: '' }
@@ -108,12 +110,14 @@ export default function UsersPage() {
     password: "",
     isActive: true,
     mustChangePassword: false,
+    assignedProjectId: "",
   });
 
   // Fetch initial roles & summary
   useEffect(() => {
     fetchSummary();
     fetchRoles();
+    fetchProjects();
   }, []);
 
   // Fetch users when query params change
@@ -153,6 +157,22 @@ export default function UsersPage() {
     }
   };
 
+  const fetchProjects = async () => {
+    try {
+      const res = await projectsApi.getProjects({ limit: 100 });
+      if (res.success && res.data) {
+        setProjects(res.data.projects || []);
+      }
+    } catch (e) {
+      console.warn("Failed to load projects", e);
+    }
+  };
+/*
+    }
+    }
+  };
+
+  */
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -202,6 +222,7 @@ export default function UsersPage() {
       password: "",
       isActive: true,
       mustChangePassword: true,
+      assignedProjectId: projects[0]?.id || "",
     });
     setShowPassword(false);
     setShowAddModal(true);
@@ -238,6 +259,7 @@ export default function UsersPage() {
       password: "",
       isActive: user.isActive,
       mustChangePassword: false,
+    assignedProjectId: "",
     });
     setShowPassword(false);
     setShowEditModal(true);
@@ -998,6 +1020,28 @@ export default function UsersPage() {
                     {selectedRoleConfig.description}
                   </p>
                 </div>
+              </div>
+
+              {/* Assigned Project Site */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                  Assigned Project Site
+                </label>
+                <select
+                  value={formData.assignedProjectId || ""}
+                  onChange={(e) => setFormData({ ...formData, assignedProjectId: e.target.value })}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 cursor-pointer"
+                >
+                  <option value="">-- No Initial Project (Unassigned) --</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      🏗️ {p.projectName} ({p.projectCode})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Optional: Assign this user directly to a construction site project.
+                </p>
               </div>
 
               {/* Password Configuration */}

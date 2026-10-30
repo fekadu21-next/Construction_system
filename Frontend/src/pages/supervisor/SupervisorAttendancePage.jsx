@@ -1,11 +1,11 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supervisorApi } from "../../services/supervisorApi.js";
 import { useSearchParams } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 
 export default function SupervisorAttendancePage() {
   const { isDark } = useTheme();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get("projectId") || "");
@@ -15,10 +15,12 @@ export default function SupervisorAttendancePage() {
   const [roster, setRoster] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ text: "", type: "" });
 
-  // Filters & Search
+  // Active Tab: "daily" | "history"
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "daily");
+
+  // Filters & Search (Daily Tab)
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL"); // ALL, PRESENT, ON_LEAVE, ABSENT, PENDING_HR
 
@@ -29,17 +31,18 @@ export default function SupervisorAttendancePage() {
   const [correctionModal, setCorrectionModal] = useState({ open: false, recordId: null, employeeName: "" });
   const [correctionReason, setCorrectionReason] = useState("");
 
-  // Add Daily Worker Modal
-  const [addWorkerModal, setAddWorkerModal] = useState(false);
-  const [newWorker, setNewWorker] = useState({
-    fullName: "",
-    phone: "",
-    trade: "GENERAL_LABORER",
-    dailyRate: 400,
-    workTeam: "Main Team",
-    nationalId: "",
+  // Attendance History Tab State
+  const [historyRecords, setHistoryRecords] = useState([]);
+  const [historySummary, setHistorySummary] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
+  const [historyFilters, setHistoryFilters] = useState({
+    startDate: "",
+    endDate: "",
+    status: "ALL",
+    trade: "ALL",
+    search: "",
   });
-  const [addingWorker, setAddingWorker] = useState(false);
 
   useEffect(() => {
     loadProjects();
@@ -47,9 +50,13 @@ export default function SupervisorAttendancePage() {
 
   useEffect(() => {
     if (selectedProjectId) {
-      loadAttendanceRoster();
+      if (activeTab === "daily") {
+        loadAttendanceRoster();
+      } else {
+        loadAttendanceHistory();
+      }
     }
-  }, [selectedProjectId, selectedDate]);
+  }, [selectedProjectId, selectedDate, activeTab, historyPagination.page, historyPagination.limit, historyFilters]);
 
   const loadProjects = async () => {
     try {
@@ -87,6 +94,88 @@ export default function SupervisorAttendancePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadAttendanceHistory = async () => {
+    setLoadingHistory(true);
+    setStatusMsg({ text: "", type: "" });
+    try {
+      const res = await supervisorApi.getAttendanceHistory({
+        projectId: selectedProjectId,
+        page: historyPagination.page,
+        limit: historyPagination.limit,
+        startDate: historyFilters.startDate,
+        endDate: historyFilters.endDate,
+        status: historyFilters.status,
+        trade: historyFilters.trade,
+        search: historyFilters.search,
+      });
+
+      if (res.success && res.data) {
+        setHistoryRecords(res.data.records || []);
+        setHistorySummary(res.data.summary || null);
+        setHistoryPagination((prev) => ({
+          ...prev,
+          page: res.data.pagination?.page || prev.page,
+          total: res.data.pagination?.total || 0,
+          totalPages: res.data.pagination?.totalPages || 1,
+        }));
+      } else {
+        setStatusMsg({ text: res.error || "Failed to load attendance history", type: "error" });
+      }
+    } catch {
+      setStatusMsg({ text: "Failed to load attendance history", type: "error" });
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const exportHistoryCSV = () => {
+    if (!historyRecords || historyRecords.length === 0) return;
+
+    const headers = [
+      "Date",
+      "Worker Code",
+      "Full Name",
+      "Trade",
+      "Work Team",
+      "Status",
+      "Check In",
+      "Check Out",
+      "Work Hours",
+      "Overtime Hours",
+      "Daily Rate (ETB)",
+      "Earned Wage (ETB)",
+      "Approval Status",
+      "Notes",
+    ];
+
+    const rows = historyRecords.map((r) => [
+      r.date,
+      r.employeeCode,
+      `"${r.fullName}"`,
+      r.trade,
+      `"${r.workTeam}"`,
+      r.status,
+      r.checkInTime,
+      r.checkOutTime,
+      r.workHours,
+      r.overtimeHours,
+      r.dailyRate,
+      r.earnedWage,
+      r.approvalStatus,
+      `"${(r.notes || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `site_attendance_history_${selectedProjectId || "site"}_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleFieldChangeByWorkerId = (employeeId, field, value) => {
@@ -140,7 +229,7 @@ export default function SupervisorAttendancePage() {
     setStatusMsg({ text: "✓ Marked all available site workers as Present (08:00 - 17:00, 8h)", type: "success" });
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveAttendance = async () => {
     setSaving(true);
     setStatusMsg({ text: "", type: "" });
     try {
@@ -161,45 +250,8 @@ export default function SupervisorAttendancePage() {
 
       const res = await supervisorApi.saveAttendance(payload);
       if (res.success) {
-        setStatusMsg({ text: "✓ Attendance draft successfully saved!", type: "success" });
-        loadAttendanceRoster();
-      } else {
-        setStatusMsg({ text: res.error, type: "error" });
-      }
-    } catch (e) {
-      setStatusMsg({ text: e.message || "Failed to save draft", type: "error" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSubmitToHR = async () => {
-    setSubmitting(true);
-    setStatusMsg({ text: "", type: "" });
-    try {
-      await supervisorApi.saveAttendance({
-        projectId: selectedProjectId,
-        date: selectedDate,
-        records: roster.map((r) => ({
-          employeeId: r.employeeId,
-          status: r.status,
-          checkInTime: r.checkInTime,
-          checkOutTime: r.checkOutTime,
-          workHours: Number(r.workHours),
-          overtimeHours: Number(r.overtimeHours),
-          notes: r.notes,
-          workTeam: r.workTeam,
-        })),
-      });
-
-      const res = await supervisorApi.submitAttendance({
-        projectId: selectedProjectId,
-        date: selectedDate,
-      });
-
-      if (res.success) {
         setStatusMsg({
-          text: "✓ Daily site attendance successfully submitted to the Accountant for wage review & disbursement!",
+          text: "✓ Attendance table successfully saved to the database! HR Manager and Accountant can now review records directly.",
           type: "success",
         });
         loadAttendanceRoster();
@@ -207,9 +259,9 @@ export default function SupervisorAttendancePage() {
         setStatusMsg({ text: res.error, type: "error" });
       }
     } catch (e) {
-      setStatusMsg({ text: e.message || "Submission failed", type: "error" });
+      setStatusMsg({ text: e.message || "Failed to save attendance", type: "error" });
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
@@ -228,38 +280,6 @@ export default function SupervisorAttendancePage() {
       }
     } catch {
       setStatusMsg({ text: "Failed to send correction request", type: "error" });
-    }
-  };
-
-  const handleAddDailyWorker = async (e) => {
-    e.preventDefault();
-    if (!newWorker.fullName.trim()) return;
-    setAddingWorker(true);
-    setStatusMsg({ text: "", type: "" });
-    try {
-      const res = await supervisorApi.addDailyWorker(selectedProjectId, newWorker);
-      if (res.success) {
-        setStatusMsg({
-          text: `✓ Daily worker ${res.data.fullName} (${res.data.employeeCode}) registered on site and submitted to HR for approval!`,
-          type: "success",
-        });
-        setAddWorkerModal(false);
-        setNewWorker({
-          fullName: "",
-          phone: "",
-          trade: "GENERAL_LABORER",
-          dailyRate: 400,
-          workTeam: "Main Team",
-          nationalId: "",
-        });
-        await loadAttendanceRoster();
-      } else {
-        setStatusMsg({ text: res.error, type: "error" });
-      }
-    } catch (err) {
-      setStatusMsg({ text: err.message || "Failed to register daily worker", type: "error" });
-    } finally {
-      setAddingWorker(false);
     }
   };
 
@@ -283,7 +303,6 @@ export default function SupervisorAttendancePage() {
   };
 
   const isApproved = attendanceData?.sheetStatus === "APPROVED";
-  const isSubmitted = attendanceData?.sheetStatus === "SUBMITTED";
 
   // KPI Calculations
   const currentProject = projects.find((p) => p.id === selectedProjectId);
@@ -325,731 +344,1004 @@ export default function SupervisorAttendancePage() {
       {/* Top Banner & Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 tracking-wider uppercase font-mono">
-              Site Supervisor Operations
-            </span>
-            <span className="text-slate-400 text-xs">• Shift Roster Desk</span>
-          </div>
+
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Daily Attendance & Labor Log
+            {activeTab === "daily" ? "Daily Attendance & Labor Log" : "Worker Attendance History"}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-            Record check-in/out times, monitor active site crews, and route daily attendance sheets directly to the Accountant for wage payout.
+            {activeTab === "daily"
+              ? "Record check-in/out times, hours, and wages. Saved attendance is stored directly in the database for the HR Manager and Accountant to view in real time."
+              : `All past worker attendance logs, audited shifts, and wage payouts for ${currentProject?.projectName || "your assigned site"}.`}
           </p>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Tab Navigation: Daily Attendance vs Attendance History */}
+        <div className="flex items-center gap-2 bg-[#091122] p-1.5 rounded-2xl border border-slate-800 self-start lg:self-auto">
           <button
             type="button"
-            onClick={() => setAddWorkerModal(true)}
-            disabled={!selectedProjectId}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+            onClick={() => setActiveTab("daily")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${activeTab === "daily"
+              ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+              : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+              }`}
           >
-            <span>➕👷‍♂️</span>
-            <span>Add Daily Worker</span>
+            <span>⏱️</span>
+            <span>Daily Attendance</span>
           </button>
 
           <button
             type="button"
-            onClick={handleMarkAllPresent}
-            disabled={isApproved || roster.length === 0}
-            className={`px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-              isApproved || roster.length === 0
-                ? "opacity-50 cursor-not-allowed bg-slate-800/40 text-slate-500 border-slate-800"
-                : isDark
-                ? "bg-[#0b1428] hover:bg-[#122040] text-emerald-400 border-emerald-500/30"
-                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
-            }`}
-            title="Mark all workers Present with standard 08:00 - 17:00 shift"
+            onClick={() => setActiveTab("history")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${activeTab === "history"
+              ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+              : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+              }`}
           >
-            <span>⚡</span>
-            <span>Mark All Present</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={saving || isApproved}
-            className={`px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-              isApproved
-                ? "opacity-50 cursor-not-allowed bg-slate-800/40 text-slate-500 border-slate-800"
-                : isDark
-                ? "border-slate-700/80 bg-[#0d162a] hover:bg-[#162342] text-slate-200"
-                : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-xs"
-            }`}
-          >
-            {saving ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <span>💾</span>
-                <span>Save Draft</span>
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSubmitToHR}
-            disabled={submitting || isApproved || roster.length === 0}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-lg cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-              isApproved
-                ? "bg-slate-700/50 text-slate-400 cursor-not-allowed shadow-none"
-                : isSubmitted
-                ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/20"
-                : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-amber-500/25"
-            }`}
-          >
-            {submitting ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-                <span>Submitting...</span>
-              </>
-            ) : isSubmitted ? (
-              <>
-                <span>📤</span>
-                <span>Re-Submit to Accountant</span>
-              </>
-            ) : (
-              <>
-                <span>🚀</span>
-                <span>Submit to Accountant for Payout</span>
-              </>
-            )}
+            <span>📜</span>
+            <span>Attendance History</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Stat Cards Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {/* Card 1: Total Workforce */}
-        <div className={`p-4 rounded-2xl border transition-all ${
-          isDark ? "bg-[#0a1224] border-slate-800" : "bg-white border-slate-200 shadow-xs"
-        }`}>
-          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-            <span className="font-semibold uppercase tracking-wider">Site Roster</span>
-            <span className="text-base">👷‍♂️</span>
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white">
-            {totalWorkers}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
-            <span>Assigned to Site</span>
-            {pendingHrCount > 0 && (
-              <span className="text-amber-500 font-semibold">• {pendingHrCount} Pending HR</span>
-            )}
-          </div>
-        </div>
-
-        {/* Card 2: Present on Shift */}
-        <div className={`p-4 rounded-2xl border transition-all ${
-          isDark ? "bg-[#061e1a] border-emerald-900/40" : "bg-emerald-50/60 border-emerald-200 shadow-xs"
-        }`}>
-          <div className="flex items-center justify-between text-emerald-500 dark:text-emerald-400 text-xs mb-1">
-            <span className="font-semibold uppercase tracking-wider">Present on Site</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
-          </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-            {presentCount}
-            <span className="text-xs font-semibold text-slate-400 ml-1">/ {totalWorkers}</span>
-          </div>
-          <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">
-            {totalWorkers > 0 ? `${Math.round((presentCount / totalWorkers) * 100)}% active shift turnout` : "0% active"}
-          </div>
-        </div>
-
-        {/* Card 3: On Leave / Absent */}
-        <div className={`p-4 rounded-2xl border transition-all ${
-          isDark ? "bg-[#0c182e] border-blue-900/40" : "bg-blue-50/60 border-blue-200 shadow-xs"
-        }`}>
-          <div className="flex items-center justify-between text-blue-500 dark:text-blue-400 text-xs mb-1">
-            <span className="font-semibold uppercase tracking-wider">Leave & Absent</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_#3b82f6]" />
-          </div>
-          <div className="text-2xl font-black text-blue-600 dark:text-blue-400">
-            {onLeaveCount + absentCount}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            {onLeaveCount} on leave • {absentCount} absent
-          </div>
-        </div>
-
-        {/* Card 4: Overtime */}
-        <div className={`p-4 rounded-2xl border transition-all ${
-          isDark ? "bg-[#1f170a] border-amber-900/40" : "bg-amber-50/60 border-amber-200 shadow-xs"
-        }`}>
-          <div className="flex items-center justify-between text-amber-500 dark:text-amber-400 text-xs mb-1">
-            <span className="font-semibold uppercase tracking-wider">Overtime Log</span>
-            <span className="text-base">⏱️</span>
-          </div>
-          <div className="text-2xl font-black text-amber-500 dark:text-amber-400">
-            {totalOtHours} <span className="text-xs font-bold text-slate-400">hrs</span>
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            {totalRegHours} hrs regular shift
-          </div>
-        </div>
-
-        {/* Card 5: Estimated Cost */}
-        <div className={`p-4 rounded-2xl border transition-all ${
-          isDark ? "bg-[#0f172a] border-slate-800" : "bg-white border-slate-200 shadow-xs"
-        }`}>
-          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-            <span className="font-semibold uppercase tracking-wider">Est. Shift Wages</span>
-            <span className="text-base">💰</span>
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white">
-            {Math.round(estimatedWageCost).toLocaleString()}{" "}
-            <span className="text-xs font-bold text-slate-400">ETB</span>
-          </div>
-          <div className="text-[11px] text-emerald-500 mt-1 font-medium">
-            → Routes to Accountant
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications / Alerts */}
-      {statusMsg.text && (
-        <div
-          className={`p-4 rounded-2xl border text-sm flex items-center justify-between shadow-md transition-all ${
-            statusMsg.type === "success"
-              ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-300"
-              : "border-rose-500/30 bg-rose-950/40 text-rose-300"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-lg">{statusMsg.type === "success" ? "✅" : "⚠️"}</span>
-            <span className="font-medium">{statusMsg.text}</span>
-          </div>
-          <button
-            onClick={() => setStatusMsg({ text: "", type: "" })}
-            className="text-xs font-bold uppercase tracking-wider underline hover:opacity-80 px-2 py-1"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Filter, Site & Date Control Bar */}
-      <div
-        className={`p-4 rounded-2xl border flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
-          isDark ? "bg-[#091122] border-slate-800" : "bg-white border-slate-200 shadow-xs"
-        }`}
-      >
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Site Project Lock/Selector */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Assigned Site Project
-            </label>
-            {projects.length === 1 ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0e1b36] border border-blue-500/30 text-xs font-bold text-blue-300">
-                <span>🔒</span>
-                <span>{projects[0].projectName}</span>
-                <span className="px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 font-mono text-[10px]">
-                  {projects[0].projectCode}
-                </span>
+      {activeTab === "daily" ? (
+        <div className="space-y-6">
+          {/* Daily Action Controls Bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl border border-slate-800 bg-[#091122]">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Shift Date */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Date:</span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-medium outline-hidden ${isDark ? "bg-[#0c1527] border-slate-700 text-slate-200 scheme-dark" : "bg-slate-50 border-slate-300 text-slate-800"
+                    }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(new Date().toISOString().split("T")[0])}
+                  className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                >
+                  Today
+                </button>
               </div>
-            ) : projects.length > 1 ? (
-              <select
-                value={selectedProjectId}
-                onChange={(e) => {
-                  setSelectedProjectId(e.target.value);
-                  setSearchParams({ projectId: e.target.value, date: selectedDate });
-                }}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold outline-hidden ${
-                  isDark
-                    ? "bg-[#0c1527] border-slate-700 text-slate-200"
-                    : "bg-slate-50 border-slate-300 text-slate-800"
-                }`}
-              >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.projectName} ({p.projectCode})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="text-xs font-semibold text-rose-400 py-1">
-                ⚠️ No site project currently assigned to you
-              </div>
-            )}
-          </div>
 
-          {/* Date Picker with Quick Date shortcuts */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Shift Date
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setSearchParams({ projectId: selectedProjectId, date: e.target.value });
-                }}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-medium outline-hidden ${
-                  isDark
-                    ? "bg-[#0c1527] border-slate-700 text-slate-200 scheme-dark"
-                    : "bg-slate-50 border-slate-300 text-slate-800"
-                }`}
-              />
+              {/* Crew Search */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search crew..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`w-44 sm:w-56 pl-7 pr-3 py-1.5 rounded-xl border text-xs outline-hidden ${isDark
+                    ? "bg-[#0c1527] border-slate-700/80 text-slate-200 placeholder-slate-500 focus:border-cyan-500"
+                    : "bg-slate-50 border-slate-300 text-slate-800 placeholder-slate-400"
+                    }`}
+                />
+                <span className="absolute left-2.5 top-1.5 text-slate-500 text-xs">🔍</span>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1.5 text-xs text-slate-400 hover:text-slate-200"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => {
-                  const today = new Date().toISOString().split("T")[0];
-                  setSelectedDate(today);
-                  setSearchParams({ projectId: selectedProjectId, date: today });
-                }}
-                className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                onClick={handleMarkAllPresent}
+                disabled={isApproved || roster.length === 0}
+                className={`px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${isApproved || roster.length === 0
+                  ? "opacity-50 cursor-not-allowed bg-slate-800/40 text-slate-500 border-slate-800"
+                  : isDark
+                    ? "bg-[#0b1428] hover:bg-[#122040] text-emerald-400 border-emerald-500/30"
+                    : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
+                  }`}
+                title="Mark all workers Present with standard 08:00 - 17:00 shift"
               >
-                Today
+                <span>⚡</span>
+                <span>Mark All Present</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveAttendance}
+                disabled={saving || isApproved || roster.length === 0}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 shadow-lg cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${isApproved || roster.length === 0
+                  ? "opacity-50 cursor-not-allowed bg-slate-800/40 text-slate-500 border-slate-800 shadow-none"
+                  : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/25"
+                  }`}
+              >
+                {saving ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                    <span>Saving to DB...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>💾</span>
+                    <span>Save </span>
+                  </>
+                )}
               </button>
             </div>
           </div>
 
-          {/* Search Box */}
-          <div className="w-full sm:w-64">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Search Crew
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search worker, EMP ID, trade..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-8 pr-3 py-1.5 rounded-xl border text-xs outline-hidden ${
-                  isDark
-                    ? "bg-[#0c1527] border-slate-700/80 text-slate-200 placeholder-slate-500 focus:border-cyan-500"
-                    : "bg-slate-50 border-slate-300 text-slate-800 placeholder-slate-400"
+          {/* KPI Stat Cards Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            {/* Card 1: Total Workforce */}
+            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#0a1224] border-slate-800" : "bg-white border-slate-200 shadow-xs"
+              }`}>
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Site Roster</span>
+                <span className="text-base">👷‍♂️</span>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white">
+                {totalWorkers}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
+                <span>Assigned to Site</span>
+                {pendingHrCount > 0 && (
+                  <span className="text-amber-500 font-semibold">• {pendingHrCount} Pending HR</span>
+                )}
+              </div>
+            </div>
+
+            {/* Card 2: Present on Shift */}
+            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#061e1a] border-emerald-900/40" : "bg-emerald-50/60 border-emerald-200 shadow-xs"
+              }`}>
+              <div className="flex items-center justify-between text-emerald-500 dark:text-emerald-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Present on Site</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
+              </div>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                {presentCount}
+                <span className="text-xs font-semibold text-slate-400 ml-1">/ {totalWorkers}</span>
+              </div>
+              <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">
+                {totalWorkers > 0 ? `${Math.round((presentCount / totalWorkers) * 100)}% active shift turnout` : "0% active"}
+              </div>
+            </div>
+
+            {/* Card 3: On Leave / Absent */}
+            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#0c182e] border-blue-900/40" : "bg-blue-50/60 border-blue-200 shadow-xs"
+              }`}>
+              <div className="flex items-center justify-between text-blue-500 dark:text-blue-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Leave & Absent</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_#3b82f6]" />
+              </div>
+              <div className="text-2xl font-black text-blue-600 dark:text-blue-400">
+                {onLeaveCount + absentCount}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                {onLeaveCount} on leave • {absentCount} absent
+              </div>
+            </div>
+
+            {/* Card 4: Overtime */}
+            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#1f170a] border-amber-900/40" : "bg-amber-50/60 border-amber-200 shadow-xs"
+              }`}>
+              <div className="flex items-center justify-between text-amber-500 dark:text-amber-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Overtime Log</span>
+                <span className="text-base">⏱️</span>
+              </div>
+              <div className="text-2xl font-black text-amber-500 dark:text-amber-400">
+                {totalOtHours} <span className="text-xs font-bold text-slate-400">hrs</span>
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                {totalRegHours} hrs regular shift
+              </div>
+            </div>
+
+            {/* Card 5: Estimated Cost */}
+            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#0f172a] border-slate-800" : "bg-white border-slate-200 shadow-xs"
+              }`}>
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Est. Shift Wages</span>
+                <span className="text-base">💰</span>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white">
+                {Math.round(estimatedWageCost).toLocaleString()}{" "}
+                <span className="text-xs font-bold text-slate-400">ETB</span>
+              </div>
+              <div className="text-[11px] text-emerald-500 mt-1 font-medium">
+                Saved to DB for Accountant &amp; HR
+              </div>
+            </div>
+          </div>
+
+          {/* Notifications / Alerts */}
+          {statusMsg.text && (
+            <div
+              className={`p-4 rounded-2xl border text-sm flex items-center justify-between shadow-md transition-all ${statusMsg.type === "success"
+                ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-300"
+                : "border-rose-500/30 bg-rose-950/40 text-rose-300"
                 }`}
-              />
-              <span className="absolute left-2.5 top-2 text-slate-500 text-xs">🔍</span>
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1.5 text-xs text-slate-400 hover:text-slate-200"
-                >
-                  ✕
-                </button>
-              )}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-lg">{statusMsg.type === "success" ? "✅" : "⚠️"}</span>
+                <span className="font-medium">{statusMsg.text}</span>
+              </div>
+              <button
+                onClick={() => setStatusMsg({ text: "", type: "" })}
+                className="text-xs font-bold uppercase tracking-wider underline hover:opacity-80 px-2 py-1"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+
+
+          {/* Attendance Table Info Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1 text-xs text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-200">Daily Site Muster Roll</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-[11px] text-slate-400">{filteredRoster.length} workers in view</span>
+            </div>
+          </div>
+
+          {/* Cybernetic High-Contrast Dark Attendance Table */}
+          <div className="rounded-2xl border border-slate-800 bg-[#070c18] shadow-2xl overflow-hidden">
+            {/* Scrollable container with sticky header - zero clipped or cut-off information */}
+            <div className="overflow-y-auto overflow-x-auto max-h-[640px] custom-scrollbar">
+              <table className="w-full min-w-[1040px] text-left border-collapse">
+                {/* Sticky Table Header pinned during vertical scroll */}
+                <thead className="sticky top-0 z-20 shadow-md">
+                  <tr className="border-b border-slate-800 bg-[#091122] text-[11px] font-bold uppercase tracking-wider text-[#8da2be] whitespace-nowrap select-none">
+                    <th className="py-3.5 px-4 bg-[#091122] min-w-[220px]">WORKER</th>
+                    <th className="py-3.5 px-3 bg-[#091122] min-w-[160px]">TRADE / SITE</th>
+                    <th className="py-3.5 px-3 bg-[#091122] min-w-[140px]">STATUS</th>
+                    <th className="py-3.5 px-3 bg-[#091122] min-w-[210px]">CHECK-IN / OUT</th>
+                    <th className="py-3.5 px-2 bg-[#091122] text-center min-w-[70px]">HOURS</th>
+                    <th className="py-3.5 px-2 bg-[#091122] text-center min-w-[65px]">OT</th>
+                    <th className="py-3.5 px-3 bg-[#091122] min-w-[180px]">NOTES</th>
+                    <th className="py-3.5 px-3 text-center bg-[#091122] min-w-[65px]">ACTION</th>
+                  </tr>
+                </thead>
+
+                {/* Table Body matching screenshot */}
+                <tbody className="divide-y divide-slate-800/60 text-sm">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <div className="w-7 h-7 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          <span className="font-semibold text-slate-300">Loading daily site muster roll...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredRoster.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-slate-400">
+                        <div className="max-w-md mx-auto space-y-2">
+                          <span className="text-3xl block">👷‍♂️</span>
+                          <p className="font-semibold text-slate-300">No workers match your current search or filters.</p>
+                          <p className="text-xs text-slate-500">
+                            Try resetting filters or use the <strong>&quot;Register Workers&quot;</strong> page from the left sidebar to add new site workers.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRoster.map((row) => {
+                      const isLeaveOrAbsent = ["ABSENT", "ON_LEAVE"].includes(row.status);
+
+                      return (
+                        <tr
+                          key={row.employeeId}
+                          className="hover:bg-[#0c162b]/70 transition-colors group"
+                        >
+                          {/* 1. WORKER Column - Full name and badges without cut-off */}
+                          <td className="py-3.5 px-4 whitespace-nowrap min-w-[220px]">
+                            <div className="flex items-center gap-3">
+                              {/* Circular Teal Avatar Badge with First Letter */}
+                              <div className="w-9 h-9 rounded-full bg-[#0d9488] text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
+                                {row.fullName ? row.fullName.charAt(0).toUpperCase() : "W"}
+                              </div>
+
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-white text-xs sm:text-sm tracking-tight">
+                                    {row.fullName}
+                                  </span>
+                                  {row.employeeStatus === "PENDING_APPROVAL" && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                                      Pending HR
+                                    </span>
+                                  )}
+                                  {row.trade === "SUPERVISOR" && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-purple-500/25 text-purple-300 border border-purple-500/40 shrink-0 flex items-center gap-1">
+                                      <span>ðŸ¦º</span> Site Supervisor
+                                    </span>
+                                  )}
+                                  {row.employmentType === "DAILY_LABORER" && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
+                                      Daily
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] font-mono text-[#34d399] font-medium tracking-wide mt-0.5">
+                                  {row.employeeCode || `EMP-${row.employeeId?.slice(-4) || "0000"}`}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 2. TRADE / SITE Column - Full Trade and Site project name */}
+                          <td className="py-3.5 px-3 whitespace-nowrap min-w-[160px]">
+                            <div>
+                              <div className="font-semibold text-white text-xs">
+                                {formatTrade(row.trade)}
+                              </div>
+                              <div className="text-[11px] text-[#8da2be] mt-0.5">
+                                {currentProject?.projectName || row.workTeam || "Unassigned"}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 3. STATUS Column (Glowing pill dropdown matching screenshot) */}
+                          <td className="py-3.5 px-3 whitespace-nowrap min-w-[140px]">
+                            <div className="relative inline-flex items-center">
+                              <div
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold select-none transition-all ${row.status === "ON_LEAVE"
+                                  ? "bg-[#0e1d3d] text-blue-300 border-blue-500/40"
+                                  : row.status === "PRESENT"
+                                    ? "bg-[#07241d] text-emerald-300 border-emerald-500/40"
+                                    : row.status === "ABSENT"
+                                      ? "bg-[#250d15] text-rose-300 border-rose-500/40"
+                                      : row.status === "LATE"
+                                        ? "bg-[#261706] text-amber-300 border-amber-500/40"
+                                        : "bg-[#1f103b] text-purple-300 border-purple-500/40"
+                                  }`}
+                              >
+                                {/* Glowing Colored Status Dot */}
+                                <span
+                                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${row.status === "ON_LEAVE"
+                                    ? "bg-blue-400 shadow-[0_0_8px_#3b82f6]"
+                                    : row.status === "PRESENT"
+                                      ? "bg-emerald-400 shadow-[0_0_8px_#10b981]"
+                                      : row.status === "ABSENT"
+                                        ? "bg-rose-400 shadow-[0_0_8px_#f43f5e]"
+                                        : row.status === "LATE"
+                                          ? "bg-amber-400 shadow-[0_0_8px_#f59e0b]"
+                                          : "bg-purple-400 shadow-[0_0_8px_#a855f7]"
+                                    }`}
+                                />
+
+                                {/* Status Label */}
+                                <span className="capitalize text-xs">
+                                  {row.status === "ON_LEAVE"
+                                    ? "On Leave"
+                                    : row.status === "PRESENT"
+                                      ? "Present"
+                                      : row.status === "ABSENT"
+                                        ? "Absent"
+                                        : row.status === "LATE"
+                                          ? "Late"
+                                          : "Half Day"}
+                                </span>
+
+                                {/* Dropdown Caret */}
+                                <svg
+                                  className="w-3.5 h-3.5 opacity-60 ml-0.5 text-current shrink-0"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+
+                              {/* Transparent Native Select Layer */}
+                              <select
+                                value={row.status}
+                                disabled={isApproved}
+                                onChange={(e) => handleFieldChangeByWorkerId(row.employeeId, "status", e.target.value)}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                              >
+                                <option value="PRESENT" className="bg-[#0b1325] text-emerald-300">
+                                  Present
+                                </option>
+                                <option value="ON_LEAVE" className="bg-[#0b1325] text-blue-300">
+                                  On Leave
+                                </option>
+                                <option value="ABSENT" className="bg-[#0b1325] text-rose-300">
+                                  Absent
+                                </option>
+                                <option value="LATE" className="bg-[#0b1325] text-amber-300">
+                                  Late
+                                </option>
+                                <option value="HALF_DAY" className="bg-[#0b1325] text-purple-300">
+                                  Half Day
+                                </option>
+                              </select>
+                            </div>
+                          </td>
+
+                          {/* 4. CHECK-IN / OUT Column - Sufficient width so numbers and pickers never cut off */}
+                          <td className="py-3.5 px-3 whitespace-nowrap min-w-[210px]">
+                            {isLeaveOrAbsent ? (
+                              <div className="flex items-center gap-1.5 font-mono text-xs text-slate-500">
+                                <div className="w-[88px] px-2.5 py-1.5 rounded-lg bg-[#0c1527] border border-slate-800 text-center select-none tracking-widest text-xs">
+                                  --:--
+                                </div>
+                                <span className="text-slate-600 font-bold text-xs">-</span>
+                                <div className="w-[88px] px-2.5 py-1.5 rounded-lg bg-[#0c1527] border border-slate-800 text-center select-none tracking-widest text-xs">
+                                  --:--
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="time"
+                                  value={row.checkInTime || "08:00"}
+                                  disabled={isApproved}
+                                  onChange={(e) =>
+                                    handleFieldChangeByWorkerId(row.employeeId, "checkInTime", e.target.value)
+                                  }
+                                  className="w-[90px] px-2 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 text-xs font-mono focus:border-cyan-500 focus:outline-hidden transition-colors scheme-dark"
+                                />
+                                <span className="text-slate-500 font-bold text-xs">-</span>
+                                <input
+                                  type="time"
+                                  value={row.checkOutTime || "17:00"}
+                                  disabled={isApproved}
+                                  onChange={(e) =>
+                                    handleFieldChangeByWorkerId(row.employeeId, "checkOutTime", e.target.value)
+                                  }
+                                  className="w-[90px] px-2 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 text-xs font-mono focus:border-cyan-500 focus:outline-hidden transition-colors scheme-dark"
+                                />
+                              </div>
+                            )}
+                          </td>
+
+                          {/* 5. HOURS Column */}
+                          <td className="py-3.5 px-2 text-center whitespace-nowrap min-w-[70px]">
+                            <span className="text-sm font-extrabold text-white tracking-wide">
+                              {row.workHours ?? 0}h
+                            </span>
+                          </td>
+
+                          {/* 6. OT Column */}
+                          <td className="py-3.5 px-2 text-center whitespace-nowrap min-w-[65px]">
+                            <input
+                              type="number"
+                              min="0"
+                              max="8"
+                              step="0.5"
+                              value={row.overtimeHours ?? 0}
+                              disabled={isApproved || isLeaveOrAbsent}
+                              onChange={(e) =>
+                                handleFieldChangeByWorkerId(row.employeeId, "overtimeHours", e.target.value)
+                              }
+                              className="w-12 px-1.5 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 text-xs font-bold text-center focus:border-amber-500 focus:outline-hidden transition-colors disabled:opacity-40"
+                            />
+                          </td>
+
+                          {/* 7. NOTES Column */}
+                          <td className="py-3.5 px-3 min-w-[180px]">
+                            <input
+                              type="text"
+                              placeholder="Add shift notes..."
+                              value={row.notes || ""}
+                              disabled={isApproved}
+                              onChange={(e) =>
+                                handleFieldChangeByWorkerId(row.employeeId, "notes", e.target.value)
+                              }
+                              className="w-full min-w-[150px] px-3 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 placeholder-slate-500 text-xs focus:border-cyan-500 focus:outline-hidden transition-colors disabled:opacity-40"
+                            />
+                          </td>
+
+                          {/* 8. Action Eye Icon Button */}
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap min-w-[65px]">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedWorkerDetail(row)}
+                              title="View Worker Shift Profile"
+                              className="w-8 h-8 mx-auto rounded-full bg-[#0c1527] hover:bg-[#142340] border border-slate-700/70 flex items-center justify-center transition-all group/eye cursor-pointer shadow-xs hover:border-cyan-500/60"
+                            >
+                              <svg
+                                className="w-4 h-4 text-slate-400 group-hover/eye:text-cyan-400 transition-colors"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
+                                <circle cx="12" cy="12" r="1.6" fill="#f43f5e" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table Footer with Summary Stats */}
+            <div className="border-t border-slate-800 bg-[#091122] px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-2">
+              <div className="flex items-center gap-4">
+                <span>
+                  Showing <strong className="text-white">{filteredRoster.length}</strong> of{" "}
+                  <strong className="text-white">{roster.length}</strong> site workers
+                </span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline">
+                  Total Shift Hours: <strong className="text-emerald-400 font-bold">{totalRegHours} hrs</strong>
+                </span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline">
+                  Overtime Logged: <strong className="text-amber-400 font-bold">{totalOtHours} hrs</strong>
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-slate-500">
+                  Auto-sync enabled • Changes saved on Draft
+                </span>
+              </div>
             </div>
           </div>
         </div>
+      ) : (
+        /* ========================================================================= */
+        /* TAB 2: ATTENDANCE HISTORY & AUDIT LOGS FOR ASSIGNED PROJECT               */
+        /* ========================================================================= */
+        <div className="space-y-6">
+          {/* History Header & Action Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border border-slate-800 bg-[#091122]">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <span>📜</span> Historical Attendance Records
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Past verified and audited attendance logs for{" "}
+                <strong className="text-amber-400">{currentProject?.projectName || "Assigned Project"}</strong>.
+              </p>
+            </div>
 
-        {/* Status Filter Pills & Sheet Badge */}
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[#070e1c] border border-slate-800 text-xs">
-            <button
-              type="button"
-              onClick={() => setStatusFilter("ALL")}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                statusFilter === "ALL"
-                  ? "bg-slate-700 text-white shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              All ({roster.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("PRESENT")}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
-                statusFilter === "PRESENT"
-                  ? "bg-[#06291e] text-emerald-300 border border-emerald-500/40"
-                  : "text-slate-400 hover:text-emerald-400"
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              Present ({presentCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("ON_LEAVE")}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
-                statusFilter === "ON_LEAVE"
-                  ? "bg-[#0c1f44] text-blue-300 border border-blue-500/40"
-                  : "text-slate-400 hover:text-blue-400"
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-              Leave ({onLeaveCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("ABSENT")}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
-                statusFilter === "ABSENT"
-                  ? "bg-[#2a0e14] text-rose-300 border border-rose-500/40"
-                  : "text-slate-400 hover:text-rose-400"
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-              Absent ({absentCount})
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={loadAttendanceHistory}
+                disabled={loadingHistory}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>🔄</span>
+                <span>{loadingHistory ? "Loading..." : "Refresh"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={exportHistoryCSV}
+                disabled={historyRecords.length === 0}
+                className="px-4 py-2 rounded-xl text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>📥</span>
+                <span>Export History CSV</span>
+              </button>
+            </div>
           </div>
 
-          {/* Sheet Status Badge */}
-          <div className="flex items-center gap-2 pl-2">
-            <span
-              className={`text-xs font-bold px-3 py-1.5 rounded-xl uppercase tracking-wider inline-flex items-center gap-1.5 ${
-                attendanceData?.sheetStatus === "APPROVED"
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                  : attendanceData?.sheetStatus === "SUBMITTED"
-                  ? "bg-blue-500/10 text-blue-400 border border-blue-500/30"
-                  : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  attendanceData?.sheetStatus === "APPROVED"
-                    ? "bg-emerald-400"
-                    : attendanceData?.sheetStatus === "SUBMITTED"
-                    ? "bg-blue-400 animate-pulse"
-                    : "bg-amber-400"
-                }`}
-              />
-              {attendanceData?.sheetStatus || "DRAFT"}
-            </span>
+          {/* Historical Summary Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div className="p-4 rounded-2xl border border-slate-800 bg-[#0a1224]">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Total Shifts Logged</span>
+                <span>📋</span>
+              </div>
+              <div className="text-2xl font-black text-white">
+                {historySummary?.totalRecords || historyPagination.total || 0}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Shift records in date window
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-emerald-900/40 bg-[#07191d]">
+              <div className="flex items-center justify-between text-emerald-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Regular Hours</span>
+                <span>⚡</span>
+              </div>
+              <div className="text-2xl font-black text-emerald-400">
+                {Number(historySummary?.totalRegularHours || 0).toLocaleString()} <span className="text-xs font-bold text-slate-400">hrs</span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Standard work shift hours
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-amber-900/40 bg-[#1f170a]">
+              <div className="flex items-center justify-between text-amber-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Overtime Hours</span>
+                <span>⏱️</span>
+              </div>
+              <div className="text-2xl font-black text-amber-400">
+                {Number(historySummary?.totalOvertimeHours || 0).toLocaleString()} <span className="text-xs font-bold text-slate-400">hrs</span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Approved site overtime
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-blue-900/40 bg-[#0a152d]">
+              <div className="flex items-center justify-between text-blue-400 text-xs mb-1">
+                <span className="font-semibold uppercase tracking-wider">Total Est. Wages</span>
+                <span>💰</span>
+              </div>
+              <div className="text-2xl font-black text-white">
+                {Math.round(Number(historySummary?.totalEstimatedWages || 0)).toLocaleString()}{" "}
+                <span className="text-xs font-bold text-blue-400">ETB</span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Gross labor valuation
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Attendance Table Info Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1 text-xs text-slate-400">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-200">Daily Site Muster Roll</span>
-          <span className="text-slate-600">•</span>
-          <span className="text-[11px] text-slate-400">{filteredRoster.length} workers in view</span>
-        </div>
-        <div className="inline-flex items-center gap-2 text-emerald-400 text-[11px] font-semibold bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-xl shadow-xs self-start sm:self-auto">
-          <span className="text-sm">⇅</span>
-          <span>Scroll table vertically to view complete worker roster</span>
-        </div>
-      </div>
+          {/* History Filters Strip */}
+          <div className="p-4 rounded-2xl border border-slate-800 bg-[#091122] flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Start Date */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={historyFilters.startDate}
+                  onChange={(e) =>
+                    setHistoryFilters((prev) => ({ ...prev, startDate: e.target.value }))
+                  }
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-[#0c1527] text-slate-200 text-xs scheme-dark outline-hidden focus:border-amber-500"
+                />
+              </div>
 
-      {/* Cybernetic High-Contrast Dark Attendance Table */}
-      <div className="rounded-2xl border border-slate-800 bg-[#070c18] shadow-2xl overflow-hidden">
-        {/* Scrollable container with sticky header - zero clipped or cut-off information */}
-        <div className="overflow-y-auto overflow-x-auto max-h-[640px] custom-scrollbar">
-          <table className="w-full min-w-[1040px] text-left border-collapse">
-            {/* Sticky Table Header pinned during vertical scroll */}
-            <thead className="sticky top-0 z-20 shadow-md">
-              <tr className="border-b border-slate-800 bg-[#091122] text-[11px] font-bold uppercase tracking-wider text-[#8da2be] whitespace-nowrap select-none">
-                <th className="py-3.5 px-4 bg-[#091122] min-w-[220px]">WORKER</th>
-                <th className="py-3.5 px-3 bg-[#091122] min-w-[160px]">TRADE / SITE</th>
-                <th className="py-3.5 px-3 bg-[#091122] min-w-[140px]">STATUS</th>
-                <th className="py-3.5 px-3 bg-[#091122] min-w-[210px]">CHECK-IN / OUT</th>
-                <th className="py-3.5 px-2 bg-[#091122] text-center min-w-[70px]">HOURS</th>
-                <th className="py-3.5 px-2 bg-[#091122] text-center min-w-[65px]">OT</th>
-                <th className="py-3.5 px-3 bg-[#091122] min-w-[180px]">NOTES</th>
-                <th className="py-3.5 px-3 text-center bg-[#091122] min-w-[65px]">ACTION</th>
-              </tr>
-            </thead>
+              {/* End Date */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={historyFilters.endDate}
+                  onChange={(e) =>
+                    setHistoryFilters((prev) => ({ ...prev, endDate: e.target.value }))
+                  }
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-[#0c1527] text-slate-200 text-xs scheme-dark outline-hidden focus:border-amber-500"
+                />
+              </div>
 
-            {/* Table Body matching screenshot */}
-            <tbody className="divide-y divide-slate-800/60 text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <div className="w-7 h-7 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                      <span className="font-semibold text-slate-300">Loading daily site muster roll...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredRoster.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
-                    <div className="max-w-md mx-auto space-y-2">
-                      <span className="text-3xl block">👷‍♂️</span>
-                      <p className="font-semibold text-slate-300">No workers match your current search or filters.</p>
-                      <p className="text-xs text-slate-500">
-                        Try resetting filters or click <strong>&quot;Add Daily Worker&quot;</strong> to register field crew members.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredRoster.map((row) => {
-                  const isLeaveOrAbsent = ["ABSENT", "ON_LEAVE"].includes(row.status);
+              {/* Status Filter */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Shift Status
+                </label>
+                <select
+                  value={historyFilters.status}
+                  onChange={(e) =>
+                    setHistoryFilters((prev) => ({ ...prev, status: e.target.value }))
+                  }
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-[#0c1527] text-slate-200 text-xs outline-hidden focus:border-amber-500"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="PRESENT">Present</option>
+                  <option value="HALF_DAY">Half Day</option>
+                  <option value="LATE">Late</option>
+                  <option value="ON_LEAVE">On Leave</option>
+                  <option value="ABSENT">Absent</option>
+                </select>
+              </div>
 
-                  return (
-                    <tr
-                      key={row.employeeId}
-                      className="hover:bg-[#0c162b]/70 transition-colors group"
+              {/* Trade Filter */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Trade / Craft
+                </label>
+                <select
+                  value={historyFilters.trade}
+                  onChange={(e) =>
+                    setHistoryFilters((prev) => ({ ...prev, trade: e.target.value }))
+                  }
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-[#0c1527] text-slate-200 text-xs outline-hidden focus:border-amber-500"
+                >
+                  <option value="ALL">All Trades</option>
+                  <option value="GENERAL_LABORER">General Laborer</option>
+                  <option value="MASON">Mason</option>
+                  <option value="CARPENTER">Carpenter</option>
+                  <option value="STEEL_FIXER">Steel Fixer</option>
+                  <option value="ELECTRICIAN">Electrician</option>
+                  <option value="PLUMBER">Plumber</option>
+                  <option value="PAINTER">Painter</option>
+                  <option value="WELDER">Welder</option>
+                  <option value="SCAFFOLDER">Scaffolder</option>
+                  <option value="HEAVY_OPERATOR">Heavy Operator</option>
+                  <option value="SITE_HELPER">Site Helper</option>
+                </select>
+              </div>
+
+              {/* Search Worker */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Search Worker
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Name or EMP ID..."
+                    value={historyFilters.search}
+                    onChange={(e) =>
+                      setHistoryFilters((prev) => ({ ...prev, search: e.target.value }))
+                    }
+                    className="pl-7 pr-3 py-1.5 rounded-xl border border-slate-700 bg-[#0c1527] text-slate-200 text-xs placeholder-slate-500 outline-hidden focus:border-amber-500 w-44"
+                  />
+                  <span className="absolute left-2.5 top-1.5 text-xs text-slate-500">🔍</span>
+                </div>
+              </div>
+
+              {/* Clear Filters */}
+              {(historyFilters.startDate ||
+                historyFilters.endDate ||
+                historyFilters.status !== "ALL" ||
+                historyFilters.trade !== "ALL" ||
+                historyFilters.search) && (
+                  <div className="self-end pb-0.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHistoryFilters({
+                          startDate: "",
+                          endDate: "",
+                          status: "ALL",
+                          trade: "ALL",
+                          search: "",
+                        })
+                      }
+                      className="text-xs text-amber-400 hover:text-amber-300 font-semibold px-2 py-1.5 rounded-lg border border-amber-500/30 hover:bg-amber-500/10 transition-colors"
                     >
-                      {/* 1. WORKER Column - Full name and badges without cut-off */}
-                      <td className="py-3.5 px-4 whitespace-nowrap min-w-[220px]">
-                        <div className="flex items-center gap-3">
-                          {/* Circular Teal Avatar Badge with First Letter */}
-                          <div className="w-9 h-9 rounded-full bg-[#0d9488] text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
-                            {row.fullName ? row.fullName.charAt(0).toUpperCase() : "W"}
-                          </div>
+                      Reset Filters
+                    </button>
+                  </div>
+                )}
+            </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-white text-xs sm:text-sm tracking-tight">
-                                {row.fullName}
-                              </span>
-                              {row.employeeStatus === "PENDING_APPROVAL" && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                                  Pending HR
-                                </span>
-                              )}
-                              {row.trade === "SUPERVISOR" && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-purple-500/25 text-purple-300 border border-purple-500/40 shrink-0 flex items-center gap-1">
-                                  <span>ðŸ¦º</span> Site Supervisor
-                                </span>
-                              )}
-                              {row.employmentType === "DAILY_LABORER" && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
-                                  Daily
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] font-mono text-[#34d399] font-medium tracking-wide mt-0.5">
-                              {row.employeeCode || `EMP-${row.employeeId?.slice(-4) || "0000"}`}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
+            <div className="text-xs text-slate-400 font-medium">
+              Total: <strong className="text-white">{historyPagination.total}</strong> records
+            </div>
+          </div>
 
-                      {/* 2. TRADE / SITE Column - Full Trade and Site project name */}
-                      <td className="py-3.5 px-3 whitespace-nowrap min-w-[160px]">
-                        <div>
-                          <div className="font-semibold text-white text-xs">
-                            {formatTrade(row.trade)}
-                          </div>
-                          <div className="text-[11px] text-[#8da2be] mt-0.5">
-                            {currentProject?.projectName || row.workTeam || "Unassigned"}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 3. STATUS Column (Glowing pill dropdown matching screenshot) */}
-                      <td className="py-3.5 px-3 whitespace-nowrap min-w-[140px]">
-                        <div className="relative inline-flex items-center">
-                          <div
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold select-none transition-all ${
-                              row.status === "ON_LEAVE"
-                                ? "bg-[#0e1d3d] text-blue-300 border-blue-500/40"
-                                : row.status === "PRESENT"
-                                ? "bg-[#07241d] text-emerald-300 border-emerald-500/40"
-                                : row.status === "ABSENT"
-                                ? "bg-[#250d15] text-rose-300 border-rose-500/40"
-                                : row.status === "LATE"
-                                ? "bg-[#261706] text-amber-300 border-amber-500/40"
-                                : "bg-[#1f103b] text-purple-300 border-purple-500/40"
-                            }`}
-                          >
-                            {/* Glowing Colored Status Dot */}
-                            <span
-                              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                                row.status === "ON_LEAVE"
-                                  ? "bg-blue-400 shadow-[0_0_8px_#3b82f6]"
-                                  : row.status === "PRESENT"
-                                  ? "bg-emerald-400 shadow-[0_0_8px_#10b981]"
-                                  : row.status === "ABSENT"
-                                  ? "bg-rose-400 shadow-[0_0_8px_#f43f5e]"
-                                  : row.status === "LATE"
-                                  ? "bg-amber-400 shadow-[0_0_8px_#f59e0b]"
-                                  : "bg-purple-400 shadow-[0_0_8px_#a855f7]"
-                              }`}
-                            />
-
-                            {/* Status Label */}
-                            <span className="capitalize text-xs">
-                              {row.status === "ON_LEAVE"
-                                ? "On Leave"
-                                : row.status === "PRESENT"
-                                ? "Present"
-                                : row.status === "ABSENT"
-                                ? "Absent"
-                                : row.status === "LATE"
-                                ? "Late"
-                                : "Half Day"}
-                            </span>
-
-                            {/* Dropdown Caret */}
-                            <svg
-                              className="w-3.5 h-3.5 opacity-60 ml-0.5 text-current shrink-0"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-
-                          {/* Transparent Native Select Layer */}
-                          <select
-                            value={row.status}
-                            disabled={isApproved}
-                            onChange={(e) => handleFieldChangeByWorkerId(row.employeeId, "status", e.target.value)}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                          >
-                            <option value="PRESENT" className="bg-[#0b1325] text-emerald-300">
-                              Present
-                            </option>
-                            <option value="ON_LEAVE" className="bg-[#0b1325] text-blue-300">
-                              On Leave
-                            </option>
-                            <option value="ABSENT" className="bg-[#0b1325] text-rose-300">
-                              Absent
-                            </option>
-                            <option value="LATE" className="bg-[#0b1325] text-amber-300">
-                              Late
-                            </option>
-                            <option value="HALF_DAY" className="bg-[#0b1325] text-purple-300">
-                              Half Day
-                            </option>
-                          </select>
-                        </div>
-                      </td>
-
-                      {/* 4. CHECK-IN / OUT Column - Sufficient width so numbers and pickers never cut off */}
-                      <td className="py-3.5 px-3 whitespace-nowrap min-w-[210px]">
-                        {isLeaveOrAbsent ? (
-                          <div className="flex items-center gap-1.5 font-mono text-xs text-slate-500">
-                            <div className="w-[88px] px-2.5 py-1.5 rounded-lg bg-[#0c1527] border border-slate-800 text-center select-none tracking-widest text-xs">
-                              --:--
-                            </div>
-                            <span className="text-slate-600 font-bold text-xs">-</span>
-                            <div className="w-[88px] px-2.5 py-1.5 rounded-lg bg-[#0c1527] border border-slate-800 text-center select-none tracking-widest text-xs">
-                              --:--
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="time"
-                              value={row.checkInTime || "08:00"}
-                              disabled={isApproved}
-                              onChange={(e) =>
-                                handleFieldChangeByWorkerId(row.employeeId, "checkInTime", e.target.value)
-                              }
-                              className="w-[90px] px-2 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 text-xs font-mono focus:border-cyan-500 focus:outline-hidden transition-colors scheme-dark"
-                            />
-                            <span className="text-slate-500 font-bold text-xs">-</span>
-                            <input
-                              type="time"
-                              value={row.checkOutTime || "17:00"}
-                              disabled={isApproved}
-                              onChange={(e) =>
-                                handleFieldChangeByWorkerId(row.employeeId, "checkOutTime", e.target.value)
-                              }
-                              className="w-[90px] px-2 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 text-xs font-mono focus:border-cyan-500 focus:outline-hidden transition-colors scheme-dark"
-                            />
-                          </div>
-                        )}
-                      </td>
-
-                      {/* 5. HOURS Column */}
-                      <td className="py-3.5 px-2 text-center whitespace-nowrap min-w-[70px]">
-                        <span className="text-sm font-extrabold text-white tracking-wide">
-                          {row.workHours ?? 0}h
-                        </span>
-                      </td>
-
-                      {/* 6. OT Column */}
-                      <td className="py-3.5 px-2 text-center whitespace-nowrap min-w-[65px]">
-                        <input
-                          type="number"
-                          min="0"
-                          max="8"
-                          step="0.5"
-                          value={row.overtimeHours ?? 0}
-                          disabled={isApproved || isLeaveOrAbsent}
-                          onChange={(e) =>
-                            handleFieldChangeByWorkerId(row.employeeId, "overtimeHours", e.target.value)
-                          }
-                          className="w-12 px-1.5 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 text-xs font-bold text-center focus:border-amber-500 focus:outline-hidden transition-colors disabled:opacity-40"
-                        />
-                      </td>
-
-                      {/* 7. NOTES Column */}
-                      <td className="py-3.5 px-3 min-w-[180px]">
-                        <input
-                          type="text"
-                          placeholder="Add shift notes..."
-                          value={row.notes || ""}
-                          disabled={isApproved}
-                          onChange={(e) =>
-                            handleFieldChangeByWorkerId(row.employeeId, "notes", e.target.value)
-                          }
-                          className="w-full min-w-[150px] px-3 py-1.5 rounded-lg bg-[#0c1527] border border-slate-700/70 text-slate-200 placeholder-slate-500 text-xs focus:border-cyan-500 focus:outline-hidden transition-colors disabled:opacity-40"
-                        />
-                      </td>
-
-                      {/* 8. Action Eye Icon Button */}
-                      <td className="py-3.5 px-3 text-center whitespace-nowrap min-w-[65px]">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedWorkerDetail(row)}
-                          title="View Worker Shift Profile"
-                          className="w-8 h-8 mx-auto rounded-full bg-[#0c1527] hover:bg-[#142340] border border-slate-700/70 flex items-center justify-center transition-all group/eye cursor-pointer shadow-xs hover:border-cyan-500/60"
-                        >
-                          <svg
-                            className="w-4 h-4 text-slate-400 group-hover/eye:text-cyan-400 transition-colors"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                            <circle cx="12" cy="12" r="1.6" fill="#f43f5e" />
-                          </svg>
-                        </button>
+          {/* History Records Table */}
+          <div className="rounded-3xl border border-slate-800 bg-[#091122] overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-[#0c1527] border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Worker Identity</th>
+                    <th className="py-3 px-4">Trade & Team</th>
+                    <th className="py-3 px-4">Shift Status</th>
+                    <th className="py-3 px-3 text-center">In - Out</th>
+                    <th className="py-3 px-3 text-center">Hours</th>
+                    <th className="py-3 px-3 text-center">Overtime</th>
+                    <th className="py-3 px-3 text-right">Daily Rate</th>
+                    <th className="py-3 px-3 text-right">Est. Wage</th>
+                    <th className="py-3 px-3 text-center">DB Status</th>
+                    <th className="py-3 px-4">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
+                  {loadingHistory ? (
+                    <tr>
+                      <td colSpan={11} className="py-16 text-center text-slate-400">
+                        <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                        <span>Loading attendance history logs for assigned project...</span>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ) : historyRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="py-16 text-center text-slate-400">
+                        <span className="text-3xl block mb-2">📜</span>
+                        <p className="text-sm font-semibold text-slate-300">
+                          No attendance history records found matching your filters.
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Try selecting a different date range or resetting the filters.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    historyRecords.map((item, idx) => (
+                      <tr
+                        key={item.id || idx}
+                        className="hover:bg-slate-800/40 transition-colors"
+                      >
+                        {/* Date */}
+                        <td className="py-3 px-4 font-mono text-slate-300 font-semibold whitespace-nowrap">
+                          {item.date}
+                        </td>
 
-        {/* Table Footer with Summary Stats */}
-        <div className="border-t border-slate-800 bg-[#091122] px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-2">
-          <div className="flex items-center gap-4">
-            <span>
-              Showing <strong className="text-white">{filteredRoster.length}</strong> of{" "}
-              <strong className="text-white">{roster.length}</strong> site workers
-            </span>
-            <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline">
-              Total Shift Hours: <strong className="text-emerald-400 font-bold">{totalRegHours} hrs</strong>
-            </span>
-            <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline">
-              Overtime Logged: <strong className="text-amber-400 font-bold">{totalOtHours} hrs</strong>
-            </span>
-          </div>
+                        {/* Worker Identity */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-teal-500 text-slate-950 font-bold flex items-center justify-center text-xs shrink-0">
+                              {item.fullName ? item.fullName.charAt(0).toUpperCase() : "W"}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-white text-xs truncate max-w-[160px]">
+                                {item.fullName}
+                              </div>
+                              <div className="font-mono text-[10px] text-emerald-400">
+                                {item.employeeCode}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
 
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-slate-500">
-              Auto-sync enabled • Changes saved on Draft
-            </span>
+                        {/* Trade & Team */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-800 text-slate-300">
+                            {formatTrade(item.trade)}
+                          </span>
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            {item.workTeam || "Main Team"}
+                          </div>
+                        </td>
+
+                        {/* Shift Status */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${item.status === "PRESENT"
+                              ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                              : item.status === "HALF_DAY"
+                                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                                : item.status === "LATE"
+                                  ? "bg-orange-500/15 text-orange-300 border border-orange-500/30"
+                                  : item.status === "ON_LEAVE"
+                                    ? "bg-blue-500/15 text-blue-300 border border-blue-500/30"
+                                    : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                              }`}
+                          >
+                            <span>
+                              {item.status === "PRESENT"
+                                ? "🟢"
+                                : item.status === "HALF_DAY"
+                                  ? "🟡"
+                                  : item.status === "LATE"
+                                    ? "🟠"
+                                    : item.status === "ON_LEAVE"
+                                      ? "🔵"
+                                      : "🔴"}
+                            </span>
+                            <span>{item.status?.replace(/_/g, " ")}</span>
+                          </span>
+                        </td>
+
+                        {/* Shift Times */}
+                        <td className="py-3 px-3 text-center font-mono text-slate-300 text-xs whitespace-nowrap">
+                          {item.checkInTime && item.checkOutTime ? (
+                            <span>
+                              {item.checkInTime} - {item.checkOutTime}
+                            </span>
+                          ) : item.checkInTime ? (
+                            <span>In: {item.checkInTime}</span>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
+                        </td>
+
+                        {/* Work Hours */}
+                        <td className="py-3 px-3 text-center font-bold text-white whitespace-nowrap">
+                          {Number(item.workHours) > 0 ? `${item.workHours}h` : "0h"}
+                        </td>
+
+                        {/* Overtime */}
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          {Number(item.overtimeHours) > 0 ? (
+                            <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              +{item.overtimeHours}h OT
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">0h</span>
+                          )}
+                        </td>
+
+                        {/* Daily Rate */}
+                        <td className="py-3 px-3 text-right font-mono text-slate-300 whitespace-nowrap">
+                          {Number(item.dailyRate || 0).toLocaleString()} <span className="text-[10px] text-slate-500">ETB</span>
+                        </td>
+
+                        {/* Est. Wage */}
+                        <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
+                          {Math.round(Number(item.earnedWage || 0)).toLocaleString()}{" "}
+                          <span className="text-[10px] text-slate-500">ETB</span>
+                        </td>
+
+                        {/* DB Approval Status */}
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.approvalStatus === "APPROVED"
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              : item.approvalStatus === "SUBMITTED"
+                                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                : item.approvalStatus === "REJECTED"
+                                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                  : "bg-slate-800 text-slate-300 border border-slate-700"
+                              }`}
+                          >
+                            {item.approvalStatus || "SAVED"}
+                          </span>
+                        </td>
+
+                        {/* Notes */}
+                        <td className="py-3 px-4 text-xs text-slate-400 max-w-xs truncate" title={item.notes || ""}>
+                          {item.notes ? (
+                            <span className="italic">{item.notes}</span>
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* History Pagination Footer */}
+            <div className="border-t border-slate-800 bg-[#091122] px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-3">
+              <div>
+                Page <strong className="text-white">{historyPagination.page}</strong> of{" "}
+                <strong className="text-white">{historyPagination.totalPages}</strong> (
+                <strong className="text-white">{historyPagination.total}</strong> total logs)
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={historyPagination.page <= 1 || loadingHistory}
+                  onClick={() =>
+                    setHistoryPagination((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))
+                  }
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+                >
+                  ← Previous
+                </button>
+                <span className="px-2 font-mono text-slate-300">
+                  {historyPagination.page} / {historyPagination.totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={historyPagination.page >= historyPagination.totalPages || loadingHistory}
+                  onClick={() =>
+                    setHistoryPagination((prev) => ({ ...prev, page: prev.page + 1 }))
+                  }
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Worker Detail Inspection Modal (Opened via Eye Icon) */}
       {selectedWorkerDetail && (
@@ -1203,149 +1495,7 @@ export default function SupervisorAttendancePage() {
         </div>
       )}
 
-      {/* Register Daily Worker Modal */}
-      {addWorkerModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <form
-            onSubmit={handleAddDailyWorker}
-            className="max-w-md w-full rounded-3xl p-6 border border-slate-800 bg-[#091124] text-slate-100 shadow-2xl relative"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xl">
-                👷‍♂️
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-white">Register On-Site Daily Laborer</h3>
-                <p className="text-[11px] text-slate-400">Added to today&apos;s shift & routed to HR for verification</p>
-              </div>
-            </div>
 
-            {/* Destination Project Notice */}
-            <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-800/40 text-amber-300 text-xs mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">🔒 Destination Site:</span>
-                <span className="font-bold underline">
-                  {currentProject?.projectName || "Assigned Project"}
-                </span>
-              </div>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-amber-500/20 font-mono font-bold">
-                {currentProject?.projectCode}
-              </span>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Almaz Kebede"
-                  value={newWorker.fullName}
-                  onChange={(e) => setNewWorker({ ...newWorker, fullName: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border border-slate-700/80 bg-[#0c1527] text-white placeholder-slate-500 focus:border-emerald-500 outline-hidden"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold uppercase tracking-wider text-slate-400 mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="0911000000"
-                    value={newWorker.phone}
-                    onChange={(e) => setNewWorker({ ...newWorker, phone: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-700/80 bg-[#0c1527] text-white placeholder-slate-500 focus:border-emerald-500 outline-hidden"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold uppercase tracking-wider text-slate-400 mb-1">
-                    Daily Wage (ETB)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="10"
-                    value={newWorker.dailyRate}
-                    onChange={(e) => setNewWorker({ ...newWorker, dailyRate: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-700/80 bg-[#0c1527] text-white focus:border-emerald-500 outline-hidden font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold uppercase tracking-wider text-slate-400 mb-1">
-                    Trade / Craft
-                  </label>
-                  <select
-                    value={newWorker.trade}
-                    onChange={(e) => setNewWorker({ ...newWorker, trade: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-700/80 bg-[#0c1527] text-white focus:border-emerald-500 outline-hidden"
-                  >
-                    <option value="GENERAL_LABORER">General Laborer</option>
-                    <option value="MASON">Mason (Plaster / Brick)</option>
-                    <option value="CARPENTER">Carpenter / Formwork</option>
-                    <option value="STEEL_FIXER">Steel Fixer / Rebar</option>
-                    <option value="ELECTRICIAN">Electrician</option>
-                    <option value="PLUMBER">Plumber / Pipefitter</option>
-                    <option value="PAINTER">Painter</option>
-                    <option value="WELDER">Welder</option>
-                    <option value="SCAFFOLDER">Scaffolder</option>
-                    <option value="HEAVY_OPERATOR">Heavy Equipment Operator</option>
-                    <option value="SITE_HELPER">Site Helper</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold uppercase tracking-wider text-slate-400 mb-1">
-                    Work Team / Gang
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Concrete Team"
-                    value={newWorker.workTeam}
-                    onChange={(e) => setNewWorker({ ...newWorker, workTeam: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-700/80 bg-[#0c1527] text-white placeholder-slate-500 focus:border-emerald-500 outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  National ID / Kebele ID (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. AA-99281-22"
-                  value={newWorker.nationalId}
-                  onChange={(e) => setNewWorker({ ...newWorker, nationalId: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border border-slate-700/80 bg-[#0c1527] text-white placeholder-slate-500 focus:border-emerald-500 outline-hidden"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => setAddWorkerModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-700 hover:bg-slate-800 text-slate-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={addingWorker}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-              >
-                {addingWorker ? "Submitting to HR..." : "✓ Submit to HR & Add to Roster"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* Correction Modal */}
       {correctionModal.open && (

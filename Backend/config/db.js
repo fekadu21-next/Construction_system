@@ -1,4 +1,4 @@
-﻿import pg from "pg";
+import pg from "pg";
 import { env } from "./env.js";
 
 const { Pool } = pg;
@@ -158,6 +158,11 @@ async function ensureSupervisorTables(client) {
       UPDATE "employees"
       SET "assignedProjectId" = NULL
       WHERE "trade" IN ('SUPERVISOR', 'SUPERVISER');
+
+      -- Expand wage and salary precision to prevent numeric field overflow
+      ALTER TABLE "employees" 
+        ALTER COLUMN "dailyRate" TYPE DECIMAL(15, 2),
+        ALTER COLUMN "monthlySalary" TYPE DECIMAL(15, 2);
     `);
     console.log("Supervisor and site operations tables verified successfully.");
   } catch (err) {

@@ -9,7 +9,7 @@ const router = express.Router();
 // All user routes require authentication
 router.use(authenticate);
 
-const USER_MANAGERS = [USER_ROLES.GENERAL_MANAGER, "ADMIN"];
+const USER_MANAGERS = [USER_ROLES.GENERAL_MANAGER, USER_ROLES.HR_MANAGER, "ADMIN"];
 const SELECT_LIST_VIEWERS = [USER_ROLES.GENERAL_MANAGER, USER_ROLES.PROJECT_MANAGER, "ADMIN"];
 
 // Specific selector endpoints

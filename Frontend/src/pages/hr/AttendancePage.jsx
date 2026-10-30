@@ -35,11 +35,17 @@ export default function AttendancePage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Review Modal State (for supervisor submission approval or rejection note)
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewAction, setReviewAction] = useState("APPROVED");
-  const [reviewerNote, setReviewerNote] = useState("");
-  const [reviewing, setReviewing] = useState(false);
+  // Report Issue Modal State (Strictly Read-Only HR: Request Supervisor Review / Report Issue)
+  const [reportIssueModal, setReportIssueModal] = useState({
+    open: false,
+    projectId: "",
+    date: "",
+    employeeId: "",
+    employeeName: "",
+    issueType: "MISSING_RECORD",
+    description: "",
+  });
+  const [submittingIssue, setSubmittingIssue] = useState(false);
 
   // Tab 2: Dashboard State
   const [dashboardData, setDashboardData] = useState(null);
@@ -62,6 +68,7 @@ export default function AttendancePage() {
   const [workerDetail, setWorkerDetail] = useState(null);
   const [loadingWorkerDetail, setLoadingWorkerDetail] = useState(false);
   const [approvingWorkerId, setApprovingWorkerId] = useState(null);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   // Tab 4: Reports State
   const [reportData, setReportData] = useState(null);
@@ -131,7 +138,7 @@ export default function AttendancePage() {
     try {
       const res = await hrApi.approveEmployee(workerId);
       if (res.success) {
-        setSuccessMsg(`✓ Daily worker ${workerName || ""} approved and marked ACTIVE in workforce!`);
+        setSuccessMsg(`✓ Daily worker "${workerName || ""}" approved and automatically added to the active employee table!`);
         await fetchDailyAttendance();
         if (selectedWorkerId === workerId) {
           openWorkerDetail(workerId);
@@ -146,27 +153,63 @@ export default function AttendancePage() {
     }
   };
 
-  const handleReviewSheet = async () => {
-    setReviewing(true);
+  const handleApproveAllPending = async () => {
+    const pendingList = roster.filter((r) => r.employeeStatus === "PENDING_APPROVAL");
+    if (pendingList.length === 0) return;
+    setApprovingAll(true);
+    setErrorMsg("");
+    setSuccessMsg("");
     try {
-      const res = await hrApi.reviewAttendance({
-        date,
-        projectId: selectedProjectId !== "all" ? selectedProjectId : null,
-        status: reviewAction,
-        reviewerNote,
+      let approvedCount = 0;
+      for (const worker of pendingList) {
+        const id = worker.employeeId || worker.id || worker.employee?.id;
+        if (id) {
+          const res = await hrApi.approveEmployee(id);
+          if (res.success) approvedCount++;
+        }
+      }
+      setSuccessMsg(`✓ Successfully approved ${approvedCount} daily worker(s)! Automatically added to active employee workforce table.`);
+      await fetchDailyAttendance();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to approve all pending daily workers");
+    } finally {
+      setApprovingAll(false);
+    }
+  };
+
+  const handleReportIssue = async () => {
+    if (!reportIssueModal.description.trim()) {
+      setErrorMsg("Please provide an issue description or reason for review.");
+      return;
+    }
+    setSubmittingIssue(true);
+    setErrorMsg("");
+    try {
+      const res = await hrApi.reportAttendanceIssue({
+        projectId: reportIssueModal.projectId,
+        date: reportIssueModal.date || date,
+        employeeId: reportIssueModal.employeeId || null,
+        issueType: reportIssueModal.issueType || "ATTENDANCE_MISMATCH",
+        description: reportIssueModal.description.trim(),
       });
       if (res.success) {
-        setSuccessMsg(`Attendance sheet marked as ${reviewAction.toLowerCase()}.`);
-        setReviewModalOpen(false);
-        setReviewerNote("");
-        fetchDailyAttendance();
+        setSuccessMsg("✓ Attendance review request sent to Site Supervisor and logged in system audit trail.");
+        setReportIssueModal({
+          open: false,
+          projectId: "",
+          date: "",
+          employeeId: "",
+          employeeName: "",
+          issueType: "MISSING_RECORD",
+          description: "",
+        });
       } else {
-        setErrorMsg(res.error || "Failed to update review status");
+        setErrorMsg(res.error || "Failed to submit attendance issue");
       }
     } catch (err) {
-      setErrorMsg(err.message || "Failed to update review status");
+      setErrorMsg(err.message || "Failed to submit attendance issue");
     } finally {
-      setReviewing(false);
+      setSubmittingIssue(false);
     }
   };
 
@@ -257,6 +300,9 @@ export default function AttendancePage() {
     const effectivePresent = exactPresent + late + halfDay * 0.5;
     const rate = working > 0 ? Math.round((effectivePresent / working) * 100) : 0;
 
+    const loggedCount = roster.filter((r) => r.isLogged).length;
+    const missing = Math.max(0, roster.length - loggedCount);
+
     return {
       present: exactPresent,
       late,
@@ -265,11 +311,12 @@ export default function AttendancePage() {
       onLeave,
       holiday,
       restDay,
+      missing,
       totalOT: Math.round(totalOT * 10) / 10,
       totalHours: Math.round(totalHours * 10) / 10,
       rate,
       total: roster.length,
-      loggedCount: roster.filter((r) => r.isLogged).length,
+      loggedCount,
     };
   }, [roster]);
 
@@ -555,84 +602,67 @@ export default function AttendancePage() {
                 <span>📥</span> Export CSV
               </button>
 
-              {isHRorGM && (
-                <>
-                  <button
-                    onClick={() => {
-                      setReviewAction("APPROVED");
-                      setReviewModalOpen(true);
-                    }}
-                    disabled={roster.length === 0}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors"
-                  >
-                    <span>✓</span> Approve Sheet
-                  </button>
-                  <button
-                    onClick={() => {
-                      setReviewAction("REJECTED");
-                      setReviewModalOpen(true);
-                    }}
-                    disabled={roster.length === 0}
-                    className="px-3.5 py-2 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 text-xs font-semibold border border-rose-300 dark:border-rose-800 transition-colors"
-                  >
-                    <span>✕</span> Return with Note
-                  </button>
-                </>
-              )}
+              <button
+                type="button"
+                onClick={() =>
+                  setReportIssueModal({
+                    open: true,
+                    projectId: selectedProjectId !== "all" ? selectedProjectId : projects[0]?.id || "",
+                    date,
+                    employeeId: "",
+                    employeeName: "",
+                    issueType: "SUPERVISOR_SUBMISSION_MISSING",
+                    description: "",
+                  })
+                }
+                className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-semibold border border-amber-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Report attendance issue or request site supervisor review without mutating records"
+              >
+                <span>🚩</span> Report Issue / Request Review
+              </button>
             </div>
           </div>
 
-          {/* Project Breakdown Chips (When All Projects Selected) */}
-          {selectedProjectId === "all" && projectSummaries.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <span className="text-xs font-bold uppercase text-slate-400 shrink-0">Projects:</span>
-              <button
-                onClick={() => setProjectFilter("all")}
-                className={`px-3 py-1 rounded-xl text-xs font-semibold shrink-0 transition-all border ${
-                  projectFilter === "all"
-                    ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
-                    : isDark
-                    ? "bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                All Projects ({roster.length})
-              </button>
-              {projectSummaries.map((ps) => (
+
+          {/* Pending Daily Workers Alert Banner */}
+          {roster.filter((r) => r.employeeStatus === "PENDING_APPROVAL").length > 0 && (
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${
+              isDark ? "bg-amber-950/30 border-amber-800/60 text-amber-200" : "bg-amber-50 border-amber-200 text-amber-900"
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl shrink-0">👷‍♂️</span>
+                <div>
+                  <h4 className="font-bold text-sm">
+                    {roster.filter((r) => r.employeeStatus === "PENDING_APPROVAL").length} New Daily Worker(s) Registered on Site Awaiting HR Approval
+                  </h4>
+                  <p className="text-xs opacity-80 mt-0.5">
+                    Click &quot;Approve Worker&quot; on any worker row below or &quot;Approve All&quot; to activate and automatically add them to the employee workforce table.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
-                  key={ps.projectId}
-                  onClick={() => setProjectFilter(projectFilter === ps.projectId ? "all" : ps.projectId)}
-                  className={`px-3 py-1 rounded-xl text-xs font-semibold shrink-0 transition-all border flex items-center gap-2 ${
-                    projectFilter === ps.projectId
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
-                      : isDark
-                      ? "bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800"
-                      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                  }`}
+                  type="button"
+                  onClick={handleApproveAllPending}
+                  disabled={approvingAll}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <span>📍 {ps.projectName}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                    projectFilter === ps.projectId
-                      ? "bg-emerald-700 text-white"
-                      : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                  }`}>
-                    {ps.presentCount}/{ps.totalWorkers} ({ps.attendanceRate}%)
-                  </span>
+                  <span>✓</span> {approvingAll ? "Approving All..." : `Approve All (${roster.filter((r) => r.employeeStatus === "PENDING_APPROVAL").length})`}
                 </button>
-              ))}
+              </div>
             </div>
           )}
 
-          {/* KPI Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
+          {/* KPI Summary Cards (Cleanly formatted in 2 rows of 4 cards) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Assigned", val: stats.total, color: "text-slate-700 dark:text-slate-200", icon: "👥" },
               { label: "Present", val: stats.present, color: "text-emerald-500", icon: "🟢" },
               { label: "Late", val: stats.late, color: "text-orange-500", icon: "🟠" },
-              { label: "Half-Day", val: stats.halfDay, color: "text-amber-500", icon: "🟡" },
               { label: "Absent", val: stats.absent, color: "text-rose-500", icon: "🔴" },
+              { label: "Missing", val: stats.missing, color: "text-amber-500", icon: "❓" },
+              { label: "Half-Day", val: stats.halfDay, color: "text-amber-400", icon: "🟡" },
               { label: "On Leave", val: stats.onLeave, color: "text-blue-500", icon: "🔵" },
-              { label: "Rate %", val: `${stats.rate}%`, color: "text-teal-500", icon: "📈" },
               { label: "Overtime", val: `${stats.totalOT}h`, color: "text-indigo-500", icon: "⏱️" },
             ].map((kpi, idx) => (
               <div
@@ -926,6 +956,24 @@ export default function AttendancePage() {
                                 title="View Worker Attendance History"
                               >
                                 👁️
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setReportIssueModal({
+                                    open: true,
+                                    projectId: item.projectId || (selectedProjectId !== "all" ? selectedProjectId : projects[0]?.id || ""),
+                                    date,
+                                    employeeId: workerId,
+                                    employeeName: workerName,
+                                    issueType: "ATTENDANCE_MISMATCH",
+                                    description: "",
+                                  })
+                                }
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title="Report attendance discrepancy / request review for this worker"
+                              >
+                                🚩
                               </button>
                             </div>
                           </td>
@@ -1537,58 +1585,125 @@ export default function AttendancePage() {
       )}
 
       {/* ============================================================= */}
-      {/* REVIEW & APPROVAL MODAL (HR / GM ACTION)                       */}
+      {/* REPORT ATTENDANCE ISSUE / REQUEST SUPERVISOR REVIEW MODAL     */}
       {/* ============================================================= */}
-      {reviewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-          <div className={`w-full max-w-md p-6 rounded-2xl border shadow-xl ${
-            isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+      {reportIssueModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className={`w-full max-w-lg p-6 rounded-2xl border shadow-2xl ${
+            isDark ? "bg-[#091122] border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
           }`}>
-            <h3 className="text-lg font-bold">
-              {reviewAction === "APPROVED" ? "Approve Attendance Sheet" : "Return Sheet for Correction"}
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              {reviewAction === "APPROVED"
-                ? `You are confirming and verifying the site attendance sheet for ${date}.`
-                : `You are returning the site attendance sheet for ${date} to site supervisor with corrective feedback.`}
-            </p>
-
-            <div className="mt-4">
-              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
-                {reviewAction === "APPROVED" ? "Reviewer Note (Optional)" : "Correction Reason / Instructions (Required)"}
-              </label>
-              <textarea
-                rows={3}
-                value={reviewerNote}
-                onChange={(e) => setReviewerNote(e.target.value)}
-                placeholder={
-                  reviewAction === "APPROVED"
-                    ? "Verified against site logbook..."
-                    : "Please recheck overtime hours for carpenter crew..."
-                }
-                className={`w-full p-3 rounded-xl text-xs border focus:ring-2 focus:ring-emerald-500 ${
-                  isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"
-                }`}
-              />
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🚩</span>
+                <div>
+                  <h3 className="text-base font-bold">Report Attendance Issue / Request Review</h3>
+                  <p className="text-xs text-slate-400">
+                    HR is strictly read-only. This action requests a review from the Site Supervisor without altering raw records.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReportIssueModal({ ...reportIssueModal, open: false })}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-3">
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Project Site
+                  </label>
+                  <select
+                    value={reportIssueModal.projectId}
+                    onChange={(e) => setReportIssueModal({ ...reportIssueModal, projectId: e.target.value })}
+                    className={`w-full p-2.5 rounded-xl text-xs border outline-hidden ${
+                      isDark ? "bg-[#0c1527] border-slate-700 text-white" : "bg-slate-50 border-slate-300"
+                    }`}
+                  >
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.projectName} ({p.projectCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Attendance Date
+                  </label>
+                  <input
+                    type="date"
+                    value={reportIssueModal.date}
+                    onChange={(e) => setReportIssueModal({ ...reportIssueModal, date: e.target.value })}
+                    className={`w-full p-2.5 rounded-xl text-xs border outline-hidden ${
+                      isDark ? "bg-[#0c1527] border-slate-700 text-white" : "bg-slate-50 border-slate-300"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Issue Type
+                </label>
+                <select
+                  value={reportIssueModal.issueType}
+                  onChange={(e) => setReportIssueModal({ ...reportIssueModal, issueType: e.target.value })}
+                  className={`w-full p-2.5 rounded-xl text-xs border outline-hidden ${
+                    isDark ? "bg-[#0c1527] border-slate-700 text-white" : "bg-slate-50 border-slate-300"
+                  }`}
+                >
+                  <option value="MISSING_RECORD">Missing Attendance Record</option>
+                  <option value="SUPERVISOR_SUBMISSION_MISSING">Site Supervisor Submission Missing</option>
+                  <option value="ATTENDANCE_MISMATCH">Check-In / Check-Out Time Mismatch</option>
+                  <option value="OVERTIME_DISCREPANCY">Overtime Discrepancy</option>
+                  <option value="LEAVE_CONFLICT">Conflict with Approved Leave</option>
+                  <option value="OTHER">Other Discrepancy</option>
+                </select>
+              </div>
+
+              {reportIssueModal.employeeName && (
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+                  Target Worker: <strong>{reportIssueModal.employeeName}</strong>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Issue Description &amp; Instructions to Supervisor
+                </label>
+                <textarea
+                  rows={3}
+                  value={reportIssueModal.description}
+                  onChange={(e) => setReportIssueModal({ ...reportIssueModal, description: e.target.value })}
+                  placeholder="Describe the discrepancy, missing roster log, or overtime question for the site supervisor..."
+                  className={`w-full p-3 rounded-xl text-xs border outline-hidden ${
+                    isDark ? "bg-[#0c1527] border-slate-700 text-white focus:border-amber-500" : "bg-slate-50 border-slate-300"
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
               <button
-                onClick={() => setReviewModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                type="button"
+                onClick={() => setReportIssueModal({ ...reportIssueModal, open: false })}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-700 hover:bg-slate-800 text-slate-300"
               >
                 Cancel
               </button>
               <button
-                onClick={handleReviewSheet}
-                disabled={reviewing || (reviewAction === "REJECTED" && !reviewerNote.trim())}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold text-white transition-colors ${
-                  reviewAction === "APPROVED"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-rose-600 hover:bg-rose-700"
-                }`}
+                type="button"
+                onClick={handleReportIssue}
+                disabled={submittingIssue || !reportIssueModal.description.trim()}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {reviewing ? "Processing..." : reviewAction === "APPROVED" ? "Confirm & Approve" : "Return Sheet"}
+                {submittingIssue ? "Logging & Notifying..." : "🚩 Send Request to Supervisor"}
               </button>
             </div>
           </div>

@@ -48,11 +48,10 @@ export default function SupervisorDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className={`p-6 rounded-2xl border ${
-        isDark
+      <div className={`p-6 rounded-2xl border ${isDark
           ? "bg-gradient-to-r from-slate-900 via-amber-950/30 to-slate-900 border-slate-800"
           : "bg-gradient-to-r from-amber-50 via-orange-50/40 to-white border-amber-100 shadow-xs"
-      }`}>
+        }`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -73,14 +72,6 @@ export default function SupervisorDashboardPage() {
               className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm shadow-xs flex items-center gap-2 transition-colors"
             >
               <span>⏱️</span> Log Daily Attendance
-            </Link>
-            <Link
-              to="/supervisor/tasks"
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-                isDark ? "border-slate-700 bg-slate-800 hover:bg-slate-700" : "border-slate-200 bg-white hover:bg-slate-50 shadow-xs"
-              }`}
-            >
-              <span>📋</span> Tasks & Progress
             </Link>
           </div>
         </div>
@@ -106,9 +97,8 @@ export default function SupervisorDashboardPage() {
       )}
 
       {primaryProject && (
-        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-          isDark ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-200 shadow-xs"
-        }`}>
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isDark ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-200 shadow-xs"
+          }`}>
           <div className="flex items-center gap-3">
             <span className="text-2xl">🏗️</span>
             <div>
@@ -124,12 +114,7 @@ export default function SupervisorDashboardPage() {
               </p>
             </div>
           </div>
-          <Link
-            to={`/supervisor/attendance?projectId=${primaryProject.id}`}
-            className="text-xs font-bold text-amber-500 hover:underline shrink-0"
-          >
-            Open Project Attendance →
-          </Link>
+
         </div>
       )}
 
@@ -207,9 +192,8 @@ export default function SupervisorDashboardPage() {
                 metrics.assignedProjects.map((p) => (
                   <div
                     key={p.id}
-                    className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                      isDark ? "bg-slate-800/40 border-slate-800 hover:border-slate-700" : "bg-slate-50 border-slate-200/80 hover:bg-white"
-                    } transition-colors`}
+                    className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isDark ? "bg-slate-800/40 border-slate-800 hover:border-slate-700" : "bg-slate-50 border-slate-200/80 hover:bg-white"
+                      } transition-colors`}
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -256,9 +240,8 @@ export default function SupervisorDashboardPage() {
             <div className="space-y-3">
               <Link
                 to="/supervisor/attendance"
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${
-                  isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
-                }`}
+                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
+                  }`}
               >
                 <span className="text-2xl">⏱️</span>
                 <div>
@@ -269,9 +252,8 @@ export default function SupervisorDashboardPage() {
 
               <Link
                 to="/supervisor/tasks"
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${
-                  isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
-                }`}
+                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
+                  }`}
               >
                 <span className="text-2xl">🏗️</span>
                 <div>

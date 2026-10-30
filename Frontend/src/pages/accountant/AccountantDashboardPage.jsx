@@ -25,7 +25,7 @@ export default function AccountantDashboardPage() {
       if (res.success) {
         setMetrics(res.data);
       } else {
-        setError(res.error);
+        setError(res.error || "Failed to load financial overview");
       }
     } catch {
       setError("Failed to load financial dashboard");
@@ -34,327 +34,384 @@ export default function AccountantDashboardPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-3 text-slate-500">
-          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Loading project financials...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className={`p-6 rounded-2xl border ${
-        isDark
-          ? "bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border-slate-800"
-          : "bg-gradient-to-r from-indigo-50 via-cyan-50/40 to-white border-indigo-100 shadow-xs"
-      }`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">Project Accounting & Cost Control</h1>
-              <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                Ledger Live
-              </span>
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Integrated project cost control, approved budget burn, labor timesheet entries, and supplier accounts payable.
-            </p>
+    <div className="space-y-6 max-w-7xl">
+      {/* Header Banner - Clean & Focused */}
+      <div
+        className={`p-6 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${isDark
+            ? "bg-gradient-to-r from-slate-900 via-[#0d1f33] to-slate-900 border-slate-800"
+            : "bg-gradient-to-r from-indigo-50 via-cyan-50/40 to-white border-indigo-100 shadow-xs"
+          }`}
+      >
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+              Finance & Ledger Hub
+            </span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            Financial Overview & Cost Control
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+            Real-time project capital allocations, expenditure burn, worker wages, and supplier accounts payable.
+          </p>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              to="/accountant/expenses"
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-xs flex items-center gap-2 transition-colors"
-            >
-              <span>➕</span> Record Expense
-            </Link>
-            <Link
-              to="/accountant/labor-costs"
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-                isDark ? "border-slate-700 bg-slate-800 hover:bg-slate-700" : "border-slate-200 bg-white hover:bg-slate-50 shadow-xs"
-              }`}
-            >
-              <span>👷‍♂️</span> Review Labor Costs
-            </Link>
-          </div>
+        {/* Quick Action Shortcuts */}
+        <div className="flex flex-wrap items-center gap-2.5">
+
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={fetchFinancialData} className="underline font-medium ml-4">Retry</button>
+        <div className="p-4 rounded-2xl border border-rose-300 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300 text-sm flex items-center justify-between shadow-xs">
+          <span>⚠️ {error}</span>
+          <button onClick={fetchFinancialData} className="underline font-bold text-xs hover:opacity-80 cursor-pointer">
+            Retry
+          </button>
         </div>
       )}
 
-      {/* Project Filter */}
-      <div className="flex items-center gap-3">
-        <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Filter By Project:</label>
-        <select
-          value={selectedProjectId}
-          onChange={(e) => setSelectedProjectId(e.target.value)}
-          className={`px-3 py-2 rounded-xl border text-sm font-semibold outline-hidden ${
-            isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-white border-slate-300 text-slate-800"
-          }`}
+      {/* Filter by Site Dropdown */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Filter By Site:</label>
+          <select
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold outline-hidden cursor-pointer ${isDark ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-200 shadow-2xs text-slate-800"
+              }`}
+          >
+            <option value="all">All Active Construction Projects</option>
+            {metrics?.projects?.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.projectName} ({p.projectCode})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <span className="text-xs text-slate-400 font-medium">
+          Reporting Currency: <strong className="text-indigo-400">ETB</strong>
+        </span>
+      </div>
+
+      {/* 4 Clean Primary Financial KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        {/* 1: Total Allocated Budget */}
+        <div
+          className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+            }`}
         >
-          <option value="all">All Active Construction Projects</option>
-          {metrics?.projects?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.projectName} ({p.projectCode})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* KPI Financial Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Approved Budget */}
-        <div className={`p-5 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Budget</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
-              💼
-            </div>
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <span>Allocated Budget</span>
+            <span className="text-base">💼</span>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
-            {metrics?.totalBudget?.toLocaleString()} <span className="text-xs text-slate-400">ETB</span>
+          <div className="text-2xl font-black text-slate-900 dark:text-white mt-2">
+            {metrics?.totalBudget?.toLocaleString() || "0"}{" "}
+            <span className="text-xs font-medium text-slate-400">ETB</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Approved total allocations</p>
+          <div className="text-xs text-slate-500 mt-1">Approved total allocations</div>
         </div>
 
-        {/* Actual Recorded Expenses */}
-        <div className={`p-5 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Actual Recorded Cost</span>
-            <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
-              📉
-            </div>
+        {/* 2: Actual Recorded Costs */}
+        <div
+          className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${isDark ? "bg-[#1f0e15] border-rose-900/40" : "bg-rose-50/60 border-rose-200 shadow-2xs"
+            }`}
+        >
+          <div className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center justify-between">
+            <span>Actual Spend</span>
+            <span className="text-base">📉</span>
           </div>
-          <div className="text-2xl font-extrabold text-rose-500">
-            {metrics?.actualExpenses?.toLocaleString()} <span className="text-xs text-slate-400">ETB</span>
+          <div className="text-2xl font-black text-rose-500 mt-2">
+            {metrics?.actualExpenses?.toLocaleString() || "0"}{" "}
+            <span className="text-xs font-medium text-slate-400">ETB</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Approved & posted expenses</p>
+          <div className="text-xs text-slate-500 mt-1">Posted project disbursements</div>
         </div>
 
-        {/* Remaining Budget */}
-        <div className={`p-5 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Remaining Budget</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
-              🛡️
-            </div>
+        {/* 3: Remaining Budget Variance */}
+        <div
+          className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${isDark ? "bg-[#081e18] border-emerald-900/40" : "bg-emerald-50/60 border-emerald-200 shadow-2xs"
+            }`}
+        >
+          <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center justify-between">
+            <span>Remaining Variance</span>
+            <span className="text-base">🛡️</span>
           </div>
-          <div className="text-2xl font-extrabold text-emerald-500">
-            {metrics?.remainingBudget?.toLocaleString()} <span className="text-xs text-slate-400">ETB</span>
+          <div className="text-2xl font-black text-emerald-500 mt-2">
+            {metrics?.remainingBudget?.toLocaleString() || "0"}{" "}
+            <span className="text-xs font-medium text-slate-400">ETB</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1 font-semibold">
-            {metrics?.budgetUtilization}% Budget Utilized
-          </p>
+          <div className="text-xs text-slate-500 mt-1">Available spending balance</div>
         </div>
 
-        {/* Outstanding Supplier Payables */}
-        <div className={`p-5 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Accounts Payable</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
-              🧾
-            </div>
+        {/* 4: Budget Burn Rate % */}
+        <div
+          className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${isDark ? "bg-[#09152b] border-blue-900/40" : "bg-blue-50/60 border-blue-200 shadow-2xs"
+            }`}
+        >
+          <div className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center justify-between">
+            <span>Budget Burn Rate</span>
+            <span className="text-base">📊</span>
           </div>
-          <div className="text-2xl font-extrabold text-amber-500">
-            {metrics?.outstandingSupplierPayables?.toLocaleString()} <span className="text-xs text-slate-400">ETB</span>
+          <div className="text-2xl font-black text-blue-400 mt-2">
+            {metrics?.budgetUtilization || 0}%
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            <Link to="/accountant/invoices" className="text-amber-400 hover:underline">
-              Unpaid supplier invoices →
-            </Link>
-          </p>
+          {/* Progress Bar */}
+          <div className="w-full bg-slate-800/40 dark:bg-slate-700/50 rounded-full h-1.5 mt-2 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${(metrics?.budgetUtilization || 0) >= 90
+                  ? "bg-rose-500"
+                  : (metrics?.budgetUtilization || 0) >= 75
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
+                }`}
+              style={{ width: `${Math.min(100, metrics?.budgetUtilization || 0)}%` }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Main Grid: Category Spending, Monthly Trends, and Operations */}
+      {/* Main Grid: Performance Table & Operational Shortcuts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column (2 Cols): Category Spending Breakdown & Monthly Trends */}
+        {/* Left Column (2 Cols): Project Budget Table & Category Spending */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Expenditure By Category */}
-          <div className={`p-6 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-            <h2 className="text-base font-bold mb-1">Expenditure Breakdown by Cost Category</h2>
-            <p className="text-xs text-slate-400 mb-4">Actual posted costs across core construction operational areas</p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                <span className="text-xs font-bold uppercase text-slate-400 block mb-1">👷 Labor</span>
-                <span className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                  {metrics?.categoryTotals?.labor?.toLocaleString() || 0} ETB
-                </span>
+          {/* Site Budget Performance Summary */}
+          <div
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+              }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Site Budget Performance Summary
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Allocated budget vs. verified actual costs by construction project
+                </p>
               </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                <span className="text-xs font-bold uppercase text-slate-400 block mb-1">🧱 Materials</span>
-                <span className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                  {metrics?.categoryTotals?.materials?.toLocaleString() || 0} ETB
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                <span className="text-xs font-bold uppercase text-slate-400 block mb-1">🚜 Equipment</span>
-                <span className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                  {metrics?.categoryTotals?.equipment?.toLocaleString() || 0} ETB
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                <span className="text-xs font-bold uppercase text-slate-400 block mb-1">⛽ Transport & Fuel</span>
-                <span className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                  {((metrics?.categoryTotals?.transportation || 0) + (metrics?.categoryTotals?.fuel || 0)).toLocaleString()} ETB
-                </span>
-              </div>
+              <Link
+                to="/accountant/budgets"
+                className="text-xs font-bold text-indigo-500 hover:underline flex items-center gap-1"
+              >
+                Manage Budgets →
+              </Link>
             </div>
-          </div>
-
-          {/* Monthly Spending Trends */}
-          <div className={`p-6 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-            <h2 className="text-base font-bold mb-1">Monthly Expenditure Velocity</h2>
-            <p className="text-xs text-slate-400 mb-4">6-Month historical cash flow disbursements</p>
-
-            <div className="space-y-3">
-              {metrics?.monthlyTrends?.map((m) => (
-                <div key={m.monthName} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-400">{m.monthName}</span>
-                    <span>{m.total?.toLocaleString()} ETB</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-full"
-                      style={{
-                        width: `${Math.min(100, (m.total / (metrics.actualExpenses || 1)) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Project Cost Table */}
-          <div className={`p-6 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-            <h2 className="text-base font-bold mb-1">Site Budget Performance Summary</h2>
-            <p className="text-xs text-slate-400 mb-4">Comparison of allocated budget against recorded actuals</p>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 uppercase font-bold">
+                  <tr
+                    className={`border-b font-bold uppercase tracking-wider text-slate-400 ${isDark ? "border-slate-800" : "border-slate-100"
+                      }`}
+                  >
                     <th className="py-2.5 px-3">Project</th>
-                    <th className="py-2.5 px-3">Approved Budget</th>
+                    <th className="py-2.5 px-3">Allocated Budget</th>
                     <th className="py-2.5 px-3">Actual Spent</th>
                     <th className="py-2.5 px-3">Remaining</th>
-                    <th className="py-2.5 px-3">Burn Rate</th>
-                    <th className="py-2.5 px-3 text-right">Risk Level</th>
+                    <th className="py-2.5 px-3">Utilization</th>
+                    <th className="py-2.5 px-3 text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {metrics?.projects?.map((p) => (
-                    <tr key={p.id}>
-                      <td className="py-3 px-3">
-                        <span className="font-bold block text-slate-900 dark:text-slate-100">{p.projectName}</span>
-                        <span className="font-mono text-slate-400">{p.projectCode}</span>
-                      </td>
-                      <td className="py-3 px-3 font-semibold">{p.budget?.toLocaleString()} ETB</td>
-                      <td className="py-3 px-3 font-bold text-rose-500">{p.spent?.toLocaleString()} ETB</td>
-                      <td className="py-3 px-3 font-bold text-emerald-500">{p.remaining?.toLocaleString()} ETB</td>
-                      <td className="py-3 px-3 font-semibold">{p.utilization}%</td>
-                      <td className="py-3 px-3 text-right">
-                        <span className={`px-2 py-0.5 rounded-md font-bold uppercase text-[10px] ${
-                          p.isHighRisk
-                            ? "bg-rose-500/10 text-rose-500 border border-rose-500/30"
-                            : "bg-emerald-500/10 text-emerald-500"
-                        }`}>
-                          {p.isHighRisk ? "Overrun Risk" : "Normal"}
-                        </span>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {metrics?.projects?.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        No active project records found.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    metrics?.projects?.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                        <td className="py-3 px-3">
+                          <span className="font-bold block text-slate-900 dark:text-slate-100">{p.projectName}</span>
+                          <span className="text-[10px] font-mono text-slate-400">{p.projectCode}</span>
+                        </td>
+                        <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">
+                          {p.budget?.toLocaleString()} ETB
+                        </td>
+                        <td className="py-3 px-3 font-bold text-rose-500">
+                          {p.spent?.toLocaleString()} ETB
+                        </td>
+                        <td className="py-3 px-3 font-bold text-emerald-500">
+                          {p.remaining?.toLocaleString()} ETB
+                        </td>
+                        <td className="py-3 px-3 font-bold text-slate-700 dark:text-slate-300">
+                          {p.utilization}%
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${p.isHighRisk
+                                ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                                : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                              }`}
+                          >
+                            {p.isHighRisk ? "Risk (≥85%)" : "On Track"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {/* Core Category Expenditure Breakdown */}
+          <div
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+              }`}
+          >
+            <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1">
+              Core Category Cost Breakdown
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Real-time expenditure split across primary construction activities
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block mb-1">👷 Labor</span>
+                <span className="text-base font-black text-slate-900 dark:text-white">
+                  {metrics?.categoryTotals?.labor?.toLocaleString() || "0"} <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block mb-1">🧱 Materials</span>
+                <span className="text-base font-black text-slate-900 dark:text-white">
+                  {metrics?.categoryTotals?.materials?.toLocaleString() || "0"} <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block mb-1">🚜 Equipment</span>
+                <span className="text-base font-black text-slate-900 dark:text-white">
+                  {metrics?.categoryTotals?.equipment?.toLocaleString() || "0"} <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block mb-1">⛽ Transport & Fuel</span>
+                <span className="text-base font-black text-slate-900 dark:text-white">
+                  {(
+                    (metrics?.categoryTotals?.transportation || 0) +
+                    (metrics?.categoryTotals?.fuel || 0)
+                  ).toLocaleString()}{" "}
+                  <span className="text-[10px] font-normal text-slate-400">ETB</span>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Right Column (1 Col): Financial Quick Actions & Operations */}
+        {/* Right Column (1 Col): Operations & Payables */}
         <div className="space-y-6">
-          <div className={`p-6 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
-            <h2 className="text-base font-bold mb-1">Financial Operations</h2>
-            <p className="text-xs text-slate-400 mb-4">Direct shortcuts for accounting & cost control</p>
+          {/* Accounts Payable Alert Card */}
+          <div
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+              }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
+                Accounts Payable
+              </span>
+              <span className="text-xl">🧾</span>
+            </div>
+            <div className="text-2xl font-black text-amber-400 mt-1">
+              {metrics?.outstandingSupplierPayables?.toLocaleString() || "0"}{" "}
+              <span className="text-xs text-slate-400">ETB</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Outstanding balance due on approved supplier invoices
+            </p>
+            <Link
+              to="/accountant/invoices"
+              className="inline-block mt-3 text-xs font-bold text-amber-400 hover:underline"
+            >
+              Review Supplier Invoices →
+            </Link>
+          </div>
 
-            <div className="space-y-3">
+          {/* Direct Accounting Navigation Shortcuts */}
+          <div
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+              }`}
+          >
+            <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1">
+              Accounting Modules
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">Quick navigation across financial tasks</p>
+
+            <div className="space-y-2.5">
               <Link
-                to="/accountant/expenses"
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${
-                  isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
-                }`}
+                to="/accountant/budgets"
+                className={`p-3 rounded-2xl border flex items-center gap-3 transition-colors ${isDark
+                    ? "bg-slate-900/60 border-slate-800 hover:bg-slate-800/60"
+                    : "bg-slate-50/70 border-slate-100 hover:bg-slate-100/70"
+                  }`}
               >
-                <span className="text-2xl">💵</span>
-                <div>
-                  <p className="text-sm font-semibold">Record Site Expense</p>
-                  <p className="text-xs text-slate-400">Post verified site disbursements & receipts</p>
+                <span className="text-xl">💼</span>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white">Project Budgets</div>
+                  <div className="text-[11px] text-slate-400 truncate">Allocated capital & revisions</div>
                 </div>
               </Link>
 
               <Link
-                to="/accountant/budgets"
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${
-                  isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
-                }`}
+                to="/accountant/expenses"
+                className={`p-3 rounded-2xl border flex items-center gap-3 transition-colors ${isDark
+                    ? "bg-slate-900/60 border-slate-800 hover:bg-slate-800/60"
+                    : "bg-slate-50/70 border-slate-100 hover:bg-slate-100/70"
+                  }`}
               >
-                <span className="text-2xl">📊</span>
-                <div>
-                  <p className="text-sm font-semibold">Project Budgets</p>
-                  <p className="text-xs text-slate-400">Configure cost baselines and category limits</p>
+                <span className="text-xl">💳</span>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white">Expenses & Ledger</div>
+                  <div className="text-[11px] text-slate-400 truncate">Post and audit disbursements</div>
                 </div>
               </Link>
 
               <Link
                 to="/accountant/labor-costs"
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${
-                  isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
-                }`}
+                className={`p-3 rounded-2xl border flex items-center gap-3 transition-colors ${isDark
+                    ? "bg-slate-900/60 border-slate-800 hover:bg-slate-800/60"
+                    : "bg-slate-50/70 border-slate-100 hover:bg-slate-100/70"
+                  }`}
               >
-                <span className="text-2xl">⏱️</span>
-                <div>
-                  <p className="text-sm font-semibold">Labor Ledger & Wages</p>
-                  <p className="text-xs text-slate-400">Reconcile worker daily wages & payroll totals</p>
+                <span className="text-xl">👷‍♂️</span>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white">Payroll & Labor Costs</div>
+                  <div className="text-[11px] text-slate-400 truncate">Timesheet wage reconciliation</div>
                 </div>
               </Link>
 
               <Link
-                to="/accountant/invoices"
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${
-                  isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
-                }`}
+                to="/accountant/material-costs"
+                className={`p-3 rounded-2xl border flex items-center gap-3 transition-colors ${isDark
+                    ? "bg-slate-900/60 border-slate-800 hover:bg-slate-800/60"
+                    : "bg-slate-50/70 border-slate-100 hover:bg-slate-100/70"
+                  }`}
               >
-                <span className="text-2xl">🧾</span>
-                <div>
-                  <p className="text-sm font-semibold">Supplier Invoices</p>
-                  <p className="text-xs text-slate-400">Review billings and release payables</p>
+                <span className="text-xl">🧱</span>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white">Material Costs</div>
+                  <div className="text-[11px] text-slate-400 truncate">Requisitions & receipt burn</div>
                 </div>
               </Link>
 
               <Link
                 to="/accountant/reports"
-                className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors ${
-                  isDark ? "bg-slate-800/40 border-slate-800 hover:bg-slate-800" : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
-                }`}
+                className={`p-3 rounded-2xl border flex items-center gap-3 transition-colors ${isDark
+                    ? "bg-slate-900/60 border-slate-800 hover:bg-slate-800/60"
+                    : "bg-slate-50/70 border-slate-100 hover:bg-slate-100/70"
+                  }`}
               >
-                <span className="text-2xl">📑</span>
-                <div>
-                  <p className="text-sm font-semibold">Financial Reports</p>
-                  <p className="text-xs text-slate-400">Export budget ledger & cost breakdown CSVs</p>
+                <span className="text-xl">📑</span>
+                <div className="min-w-0">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white">Financial Reports</div>
+                  <div className="text-[11px] text-slate-400 truncate">Cost variance and balance exports</div>
                 </div>
               </Link>
             </div>

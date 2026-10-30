@@ -36,30 +36,26 @@ export default function AccountantDashboardPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
-      {/* Header Banner - Clean & Focused */}
-      <div
-        className={`p-6 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${isDark
-            ? "bg-gradient-to-r from-slate-900 via-[#0d1f33] to-slate-900 border-slate-800"
-            : "bg-gradient-to-r from-indigo-50 via-cyan-50/40 to-white border-indigo-100 shadow-xs"
-          }`}
-      >
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-              Finance & Ledger Hub
-            </span>
+      {/* Welcome Banner */}
+      <div className={`p-6 sm:p-8 rounded-2xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80"} shadow-sm`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              Financial Overview & Cost Control
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+              Real-time project capital allocations, expenditure burn, worker wages, and supplier accounts payable.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Financial Overview & Cost Control
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-            Real-time project capital allocations, expenditure burn, worker wages, and supplier accounts payable.
-          </p>
-        </div>
-
-        {/* Quick Action Shortcuts */}
-        <div className="flex flex-wrap items-center gap-2.5">
-
+          <div className="flex items-center gap-3">
+            <Link
+              to="/accountant/expenses"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
+            >
+              <span>+</span>
+              <span>Record Expense</span>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -100,7 +96,7 @@ export default function AccountantDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
         {/* 1: Total Allocated Budget */}
         <div
-          className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+          className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
             }`}
         >
           <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
@@ -179,7 +175,7 @@ export default function AccountantDashboardPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Site Budget Performance Summary */}
           <div
-            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
               }`}
           >
             <div className="flex items-center justify-between mb-4">
@@ -260,7 +256,7 @@ export default function AccountantDashboardPage() {
 
           {/* Core Category Expenditure Breakdown */}
           <div
-            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
               }`}
           >
             <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1">
@@ -310,7 +306,7 @@ export default function AccountantDashboardPage() {
         <div className="space-y-6">
           {/* Accounts Payable Alert Card */}
           <div
-            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
               }`}
           >
             <div className="flex items-center justify-between mb-2">
@@ -336,7 +332,7 @@ export default function AccountantDashboardPage() {
 
           {/* Direct Accounting Navigation Shortcuts */}
           <div
-            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+            className={`p-6 rounded-3xl border transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
               }`}
           >
             <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1">

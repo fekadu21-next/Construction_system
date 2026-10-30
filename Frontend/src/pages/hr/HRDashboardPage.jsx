@@ -64,25 +64,25 @@ export default function HRDashboardPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Welcome & Quick Action Header */}
-      <div
-        className={`p-6 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
-          isDark
-            ? "bg-gradient-to-r from-slate-900 via-[#0d1f33] to-slate-900 border-slate-800"
-            : "bg-gradient-to-r from-emerald-50 via-teal-50/40 to-white border-emerald-100 shadow-xs"
-        }`}
-      >
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-mono">
-              Central HR Management Hub
-            </span>
+      <div className={`p-6 sm:p-8 rounded-2xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80"} shadow-sm`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              Welcome back, {user?.fullName || "HR Manager"}! 👋
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+              Real-time workforce activity, site presence, assignments, and temporary labor requests across all authorized construction projects.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Welcome, {user?.fullName || "HR Manager"} 👋
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-            Real-time workforce activity, site presence, assignments, and temporary labor requests across all authorized construction projects.
-          </p>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/hr/workers"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
+            >
+              <span>+</span>
+              <span>Manage Workers</span>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -102,7 +102,7 @@ export default function HRDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
         {/* 1: Total Workers */}
         <div className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${
-          isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
+          isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-2xs"
         }`}>
           <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
             <span>Total Workers</span>
@@ -259,7 +259,7 @@ export default function HRDashboardPage() {
         {/* Left Column (2 Cols): Activity & Attendance Summary */}
         <div className="lg:col-span-2 space-y-6">
           {/* Daily Attendance Breakdown Visualizer */}
-          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-bold text-base">Daily Site Presence Breakdown</h3>
@@ -326,7 +326,7 @@ export default function HRDashboardPage() {
           </div>
 
           {/* Recent Assignment Activity */}
-          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-bold text-base">Recent Site Assignments & Transfers</h3>
@@ -367,7 +367,7 @@ export default function HRDashboardPage() {
           </div>
 
           {/* Recent Worker Registrations */}
-          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-bold text-base">Recent Worker Registrations</h3>
@@ -417,7 +417,7 @@ export default function HRDashboardPage() {
         {/* Right Column: Pending Approvals & Ending Assignments */}
         <div className="space-y-6">
           {/* Pending Temporary Worker Requests */}
-          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-2">
@@ -469,7 +469,7 @@ export default function HRDashboardPage() {
           </div>
 
           {/* Assignments Ending Soon */}
-          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-2">
@@ -519,7 +519,7 @@ export default function HRDashboardPage() {
           </div>
 
           {/* Quick Shortcuts & Navigation Panel */}
-          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0b1329] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+          <div className={`p-6 rounded-3xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
             <h3 className="font-bold text-sm mb-3">Workforce Operations Quick Access</h3>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <Link

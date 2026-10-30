@@ -48,30 +48,28 @@ export default function SupervisorDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className={`p-6 rounded-2xl border ${isDark
-          ? "bg-gradient-to-r from-slate-900 via-amber-950/30 to-slate-900 border-slate-800"
-          : "bg-gradient-to-r from-amber-50 via-orange-50/40 to-white border-amber-100 shadow-xs"
-        }`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className={`p-6 sm:p-8 rounded-2xl border ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80"} shadow-sm`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                 Site Operations Desk
               </h1>
-              <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-500/10 text-cyan-400 border border-blue-500/20">
                 Today: {metrics?.todayDate || "Current Shift"}
               </span>
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
               Field workforce attendance, shift operations, and task milestones.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Link
               to="/supervisor/attendance"
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm shadow-xs flex items-center gap-2 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
             >
-              <span>⏱️</span> Log Daily Attendance
+              <span>⏱️</span>
+              <span>Log Daily Attendance</span>
             </Link>
           </div>
         </div>
@@ -121,46 +119,46 @@ export default function SupervisorDashboardPage() {
       {/* Primary KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Card 1: Today's Attendance */}
-        <div className={`p-5 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+        <div className={`p-6 rounded-2xl border transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80"} shadow-sm hover:border-blue-500/40`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">On-Site Today</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">On-Site Today</span>
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-lg">
               👷‍♂️
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-emerald-500">{metrics?.workforce?.presentCount ?? 0}</div>
-          <div className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+          <div className="text-3xl font-black text-emerald-500 mt-2">{metrics?.workforce?.presentCount ?? 0}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
             <span>{metrics?.workforce?.totalWorkers ?? 0} registered workers</span>
             <span>•</span>
-            <span className="font-semibold text-amber-500">{metrics?.workforce?.attendanceRate ?? 0}% presence</span>
+            <span className="font-semibold text-blue-500">{metrics?.workforce?.attendanceRate ?? 0}% presence</span>
           </div>
         </div>
 
         {/* Card 2: Attendance Submissions */}
-        <div className={`p-5 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+        <div className={`p-6 rounded-2xl border transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80"} shadow-sm hover:border-blue-500/40`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Sheet Review Status</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sheet Review Status</span>
+            <div className="h-10 w-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-lg">
               📋
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-blue-500">{metrics?.pendingSheetsCount ?? 0}</div>
-          <div className="text-xs text-slate-400 mt-1">
-            <Link to="/supervisor/attendance" className="text-blue-400 hover:underline">
+          <div className="text-3xl font-black text-blue-500 mt-2">{metrics?.pendingSheetsCount ?? 0}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <Link to="/supervisor/attendance" className="text-blue-500 hover:underline">
               Pending HR approval sheets →
             </Link>
           </div>
         </div>
 
         {/* Card 3: Tasks Due & Overdue */}
-        <div className={`p-5 rounded-2xl border ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200 shadow-xs"}`}>
+        <div className={`p-6 rounded-2xl border transition-all ${isDark ? "bg-[#0d1c33] border-slate-800" : "bg-white border-slate-200/80"} shadow-sm hover:border-blue-500/40`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tasks Due Today</span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tasks Due Today</span>
+            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold text-lg">
               ⚡
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-indigo-500">{metrics?.tasks?.dueToday ?? 0}</div>
+          <div className="text-3xl font-black text-indigo-500 mt-2">{metrics?.tasks?.dueToday ?? 0}</div>
           <div className="text-xs mt-1 flex items-center gap-1.5">
             {metrics?.tasks?.overdue > 0 ? (
               <span className="text-rose-500 font-bold">⚠️ {metrics.tasks.overdue} overdue activities</span>
